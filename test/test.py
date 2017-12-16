@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 observation = branch_1
 =======
 observation = 2_add_from_future
@@ -11,4 +10,7 @@ obervation = master1
 
 =======
 obervation = master2
+
+=======
+# boss is idot
 
