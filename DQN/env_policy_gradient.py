@@ -1,3 +1,7 @@
+'''
+this is the environment for rl_brain, it is the "cartpole" from gym of openAI
+wrote by wuyifan
+'''
 import gym
 from RL_brain_policy_gradient import Policy_Gradient as brain
 import matplotlib.pyplot as plt
