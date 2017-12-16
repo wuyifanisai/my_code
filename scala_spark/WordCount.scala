@@ -1,3 +1,8 @@
+//env:spark and scala
+//run a wordcount code for "data/LICENSE.txt"
+//author:wuyifan
+
+
 import org.apache.log4j.Logger
 import org.apache.log4j.Level
 import org.apache.spark.{SparkConf , SparkContext}
