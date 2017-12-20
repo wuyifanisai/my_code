@@ -5,7 +5,12 @@ Pendulum example.
 tensorflow 1.0
 gym 0.8.0
 """
-
+'''
+some problem ocurred when the code was running
+when it was a not bad statement, the actor_net could output a nice action to keep good statement and reward
+but when it was a bad statement, somtimes, the actor_net output a not good action, so it was a bit hard to transform a bad 
+statement to a good one
+'''
 ######################## import library #####################
 
 import tensorflow as tf 
