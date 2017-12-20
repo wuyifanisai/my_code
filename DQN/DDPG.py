@@ -34,6 +34,12 @@ ENV_NAME = 'Pendulum-v0'
 class DDPG(object):
 	def __init__(self, a_dim, s_dim, a_top):
 	# dimision of actions , statement, and limit of action
+	
+	# in the __init__ method, variable without "self" a_next, q, q_next is considered as the output from net for 
+	# next action or q_target
+	
+	# and the variables which are placeholder are prepared for input from memory when learn 
+	# tensor graph should be correct so the gradient could be right
 
 		self.memory = np.zeros((MEMORY_SIZE, 2*s_dim + a_dim + 1),dtype = np.float32)
 		# every piece of memory includes observation, observation_next, action, reward
