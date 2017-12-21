@@ -21,7 +21,7 @@ import gym as gym
 
 ################ hyper parameters ####################
 
-MAX_EPISODES = 30  # max number of round
+MAX_EPISODES = 250  # max number of round
 MAX_EP_STEPS = 200  # max number of steps in a round
 LR_A = 0.001 # learning rate for actor eva net 
 LR_C = 0.001 # learning rate for critic eva net
@@ -211,7 +211,7 @@ class DDPG(object):
 	def save_para(self):
 		# store -----
 		saver = tf.train.Saver()
-		save_path = saver.save(self.sess, "f://DDPG//DDPG.ckpt")
+		save_path = saver.save(self.sess, "f://DDPG_//DDPG.ckpt")
 		print('save to path:' , save_path)
 
 
@@ -241,7 +241,7 @@ for i in range(MAX_EPISODES):
 			env.render()
 
 			a = ddpg.choose_action(s)
-			a = [np.clip(np.random.normal(a, var), -2, 2)] 
+			#a = [np.clip(np.random.normal(a, var), -2, 2)] 
 			# add randomness to action selection for exploration
 			print(a)
 
@@ -284,7 +284,7 @@ for i in range(MAX_EPISODES):
 		
 			print('Episode:', i, ' Reward: %i' % int(ep_reward))
 			#print('Episode:', i, ' Reward: %i' % int(ep_reward), 'Explore: %.2f' % var)
-			if i > 10:RENDER = True
+			if i > MAX_EPISODES*0.8:RENDER = True
 			if j == MAX_EP_STEPS-1:
 				break
 
