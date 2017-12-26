@@ -93,6 +93,113 @@ def conv_no_batch_norm_2d(x, filter_shape, stride):
 
 	return tf.nn.relu(tf.nn.bias_add(conv , bias))
 
+def max_pool(x):
+	return tf.nn.max_pool(
+							x, 
+							ksize = [1,2,2,1], 
+							strides=[1,2,2,1], 
+							padding='SAME'
+						)
+
+def res_box(x, out_channels, down_sample, projection = False):
+	# channels of input data
+	in_channels = x.get_shape()[3]
+
+	if down_sample:
+		x = max_pool(x)
+
+	output1 = conv_with_batch_norm_2d(
+										x,
+										[3,3,in_channels,out_channels], # filter shape
+										# number of filter para is 3*3*in_channels*out_channels
+										1
+									)
+	output2 = conv_with_batch_norm_2d(
+										output2,
+										[3,3,out_channels,out_channels], # filter shape
+										# number of filter para is 3*3*out_channels*out_channels
+										1
+									)
+	if in_channels != out_channels:
+		# we need do some transform before add operation
+		if projection:
+			# here is projection shortcut
+			input_transform = conv_no_batch_norm_2d(x, [1,1,in_channels,out_channels],1)
+		else:
+			# zero - padding
+			input_transform = tf.pad(x,
+									[[0,0],[0,0],[0,0],
+									[0,out_channels - in_channels]])
+			'''
+			for example：
+			t=[[2,3,4],[5,6,7]],paddings=[[1,1],[2,2]]，mode="CONSTANT"
+			sess.run(tf.pad(t,paddings,"CONSTANT"))==>：
+				array([
+						[0, 0, 0, 0, 0, 0, 0],
+          				[0, 0, 2, 3, 4, 0, 0],
+          				[0, 0, 5, 6, 7, 0, 0],
+          				[0, 0, 0, 0, 0, 0, 0]], dtype=int32)
+			'''
+	else:
+		# no need to transform
+		input_transform = x
+
+	return output2 + input_transform # shortcut
+
+def red_group(name , x, num_res_box, out_channels):
+	assert num_res_box >=1 , 'num_res_box should be greater than 1 !'
+
+	with tf.variable_scope("%s_head"%name):
+		output = res_box(x, out_channels, True)
+
+	for i in range(num_res_box - 1): # get a series of combined res_box
+		with tf.variable_scope('%s_%d'%(name,i+1)):
+			output = res_box(output, out_channels, False)
+	return output
+
+
+################ bulid the res_net #######################
+def res_net(input):
+	with tf.variable_scope('conv1'):
+		output = conv_no_batch_norm_2d(input, [3,3,1,16], 1)
+
+	output = res_group('conv2', output, num_res_box = 2, out_channels = 16)
+	output = res_group('conv3', output, num_res_box = 2, out_channels = 32)
+	output = res_group('conv4', output, num_res_box = 2, out_channels = 64)
+
+	with tf.variable_scope('fc'):
+
+		output = max_pool(output)
+
+		shape = output.get_shape().as_list()
+
+		dim = shape[1]*shape[2]*shape[3]
+
+		output = tf.reshape(output, [-1,dim])
+
+	return full(output, [dim, 10])
+
+################### define the optimization operation ###################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
