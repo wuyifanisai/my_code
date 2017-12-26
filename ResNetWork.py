@@ -180,6 +180,49 @@ def res_net(input):
 	return full(output, [dim, 10])
 
 ################### define the optimization operation ###################
+def train_res_net(batch_size = 100, iter = 100, learnin_rate =0.001):
+	x = tf.placeholder(tf.float32,[None, 28, 28, 1])
+	# batch_data_shape ==> [batch_size, height, wide,channels]
+	y = tf.placeholder(tf.float32, [None,10])
+	# label one-hot
+
+	pred = res_net(x)  # forward caculation
+
+	cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logists(pred, y))
+
+	optimizer = tf.train.AdamOptimizer(learnin_rate).minmize(cost)
+
+	correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(y,1))
+
+	accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+	with tf.Session() as sess:
+		sess.run(tf.initialize_all_vraiables())
+		print('start training...')
+		step = 1
+
+		while step < iter:
+			batch_x, batch_y = mnist.train.next_batch(batch_size)
+
+			batch_x = np.reshape(batch_x, 
+				                [np.shape(batch_x)[0], 28, 28, 1])
+			# transform the shape 
+
+			sess.run(optimizer,feed_dict={x:batch_x, y:batch_y})
+
+			if step%10 == 0:
+				print('accuracy in train step%d is %f'%(sess.run([step,accuracy], {x:batch_x, y:batch_y})) )
+				print('loss in train step%d is %f'%(sess.run(cost,{x:batch_x, y:batch_y})))
+
+				print('test accuracy in train step%d is %f'%(accuracy,{x:mnist.test.images[:256], y:mnist.test.labels[:256]}))
+			step += 1
+		print('Done !')
+		
+
+
+
+
+
 
 
 
