@@ -40,6 +40,10 @@ A_BOUND = [env.action_space.low, env.action_space.high] # bound of action
 class ACNet(object):
 	def __init__(self, scope, globalAC):
 
+		# in the __init__ , we defined some important variables to make some function
+		# such as define loss, train_op
+		# define some important tensor graph ...
+
 		if scope == GLOBAL_NET_SCOPE: # let us make a global net
 
 			with tf.variable_scope(scope):
@@ -79,9 +83,12 @@ class ACNet(object):
 				with tf.variable_scope('c_loss'):
 					self.c_loss = tf.reduce_mean(tf.squared(td))
 
-				with tf.variable_scope('chosen_action'):
+
+				with tf.variable_scope('get_action_distribution'):
 					mu = mu*A_BOUND[1]
 					sigma += 1e-4
+					normal_dist = tf.distributions.Normal(mu, sigma)
+
 
 				with tf.variable_scope('a_loss'):
 					# we need the action from memory to get a_loss
@@ -95,7 +102,82 @@ class ACNet(object):
 
 					self.a_loss = tf.reduce_mean(error)
 
-				with 
+				with tf.variable_scope('chosen_action'):
+					# use the action_net of local net to choose action
+					self.a = tf.clip_by_value(
+											tf.squeeze(
+														normal_dist.sample(1),
+														axis = 0
+														),
+											A_BOUND[0],
+											A_BOUND[1]
+											)
+
+				with tf.variable_scope('local_gradient'):
+					# get the gradient of local net
+					# to train local network and update global network
+					self.a_grad = tf.gradient(self.a_loss, self.a_para)
+					self.c_grad = tf.gradient(self.c_loss, self.c_para)
+
+				with tf.variable_scope('sync'):
+					# todo
+
+
+				with tf.variable_scope('pull'):
+					# pull the para of global action_net to the local action_net
+					self.pull_a_para_op = [local_para.assign(global_para) for local_para, global_para in zip(self.a_para, globalAC.a_para)]
+
+					# pull the para of global critic_net to the local critic_net
+					self.pull_c_para_op = [local_para.assign(global_para) for local_para, global_para in zip(self.c_para, globalAC.c_para)]
+
+
+				with tf.variable_scope('push'):
+					# push the gradients of training to the global net
+					# use the gradients caculated from local net to train global net
+
+					self.update_gradient_action_op = optimizer_action.apply_gradients(zip(self.a_grad, globalAC.a_para))
+					self.update_gradient_critic_op = optimizer_critic.apply_gradients(zip(self.c_para, globalAC.c_para))
+
+
+
+	def _build_net(self, scope):
+		# to define a network structure for action_net ,critic_net in global and local network
+		w_init = tf.random_normal_initializer(0.0, 0.1)
+
+		with tf.variable_scope('actor'):
+			# we will get some normal_distributions of action, number of distributions is N_A
+			output_a = tf.layers.dense(
+										self.s,
+										20,
+										tf.nn.relu6,
+										kernel_initializer = w_init,
+										name = 'output_a'
+										)
+
+			mu = tf.layers.dense(  # get the mu of a normal distribution of action, dim of mu is N_A
+									output_a,
+									N_A,
+									tf.nn.tanh,
+									kernel_initializer = w_init,
+									name = 'mu'
+								)
+
+			sigma = tf.layers.dense( # get the sigma of a normal distribution of action, dim of sigma is N_A
+									output_a,
+									N_A,
+									tf.nn.softplus,
+									kernel_initializer = w_init,
+									name = 'sigma'
+								)
+
+
+
+
+
+
+
+
+
 
 
 
