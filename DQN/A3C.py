@@ -170,6 +170,51 @@ class ACNet(object):
 									name = 'sigma'
 								)
 
+		with tf.variable_scope('critic'):
+			output_c = tf.layers.dense(
+										self.s,
+										20,
+										tf.nn.relu6,
+										kernel_initializer = w_init,
+										name = 'output_c'
+										)
+
+			v = tf.layers.dense(  # we get the value of this statement self.s
+								output_c,
+								1,
+								kernel_initializer = w_init,
+								name = 'v'
+								)
+
+		a_para = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope+'/actor')
+		c_para = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope+'/critic')
+
+		return mu, sigma, v, a_para, c_para
+
+ 
+	def update_global(self, feed_dict): # push the gradients to the global net to train
+		# to train global net using the gradiients caculated from local net
+
+		SESS.run([self.update_gradient_action_op, self.update_gradient_critic_op], feed_dict)
+		# some data is from placeholder
+
+	def pull_global(self): #pull the new para from global net to local net
+		SESS.run([self.pull_a_para_op, self.pull_c_para_op])
+
+	def choose_action(self, s):
+		# we need the statement of this moment to caculate a action
+		s = s[np.new.axis, :]
+
+		return SESS.run(self.a, {self.s:s})[0]
+		# we need figure out the structure of output action
+
+
+
+
+
+
+
+
 
 
 
