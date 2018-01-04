@@ -313,6 +313,52 @@ class Worker(object):
                     			break
 
 
+if __name__ == "__main__":
+	SESS = tf.Session()
+
+	with tf.device("/cpu:0"):
+
+		optimizer_action = tf.train.RMSPropOptimizer(LR_A, name = 'RMSProp_ACTION')
+		optimizer_critic = tf.train.RMSPropOptimizer(LR_C, name = 'RMSProp_CRITIC')
+
+		globalAC = ACNet(GLOBAL_NET_SCOPE)
+		# define the global net and we only need its parameters
+
+		workers = [] # a list to store local nets
+
+		for i in range(N_WORKERS):
+			i_name = "%s_worker"%i
+			workers.append( Worker(i_name, globalAC) )
+
+		COORD = tf.train.Coordinator()
+
+		SESS.run(tf.global_variables_initializer())
+
+		worker_threads = []
+
+		for worker in workers:
+			job = lambda : worker.work() 
+			t = threading.Thread(target = job)
+			t.start()
+			worker_threads.append(t)
+
+		COORD.join(worker_threads)
+
+	plt.plot(np.arange(len(GLOBAL_RUNNING_R)), GLOBAL_RUNNING_R)
+	plt.xlabel('step')
+	plt.ylabel('total moving reward')
+	plt.show()
+
+
+
+
+
+
+
+
+
+
+
 
 
 
