@@ -208,6 +208,138 @@ class ACNet(object):
 		return SESS.run(self.a, {self.s:s})[0]
 		# we need figure out the structure of output action
 
+class Worker(object):
+	""" define local worker net , and train with envrionment itself """
+	def __init__(self, name, globalAC):
+		
+		self.env = gym.make(GAME).unwarpped
+
+		self.name = name
+
+		self.AC = ACNet(name,globalAC)
+		# globalAC is the global net connecting with the local net
+
+	def work(self):
+		global GLOBAL_RUNNNING_R, GOBAL_EP
+
+		total_step = 1
+		buffer_s = []
+		buffer_a = []
+		buffer_r = []
+
+		# let us train 
+		while not COORP.should_stop() and GLOBAL_EP < MAX_GLOBAL_EP:
+			s = self.env.reset()
+
+			ep_r = 0
+
+			# let us do every step
+			for i in range(MAX_EP_STEP):
+
+				# get the action for now
+				a = self.ACNet.choose_action(s)
+
+				# interaction with envrionment
+				s_, r, done, info = self.env.step(a)
+
+				done = True if i ==MAX_EP_STEP else False
+
+				ep_r += r
+
+				# store
+				buffer_s.append(s)
+				buffer_a.append(a)
+				buffer_r.append((r+8)/8)
+
+				# shuold update global net ?------------------------------------
+				if total_step%UPDATE_GLOBAL_ITER ==0 or done:
+					if done:
+						v_s_ = 0 
+						# it is the value of next statement
+						# if it is done, we assume it is 0
+
+					else:
+						v_s_ = SESS.run(self.AC.v, {self.AC.s:s_[np.newaxis, :]})[0, 0]
+
+					buffer_v_target = []
+					#store the v_target for caculating the loss
+
+					for r in buffer_r[::-1]: # reverse the buffer_r
+						v_target_element = r + GAMMA*v_s_
+						buffer_v_target.append(v_target_element)
+
+					buffer_v_target.reverse()
+
+					buffer_s = np.vstack(buffer_s)
+					buffer_a = np.vstack(buffer_a)
+					buffer_v_target = np.vstack(buffer_v_target)
+
+					# update global_net para with gradients from local net 
+					# and give the new para from global net to local net
+					feed_dict = {
+									self.AC.s: buffer_s,
+									self.AC.a_memory: a,
+									self.AC.v_target: buffer_v_target
+								}
+
+					# here are caculating gradients from local net
+					# and push them to global net to update para of global net
+					self.AC.update_global(feed_dict)
+
+					# and givr the new para to local net
+					self.AC.pull_global()
+
+					buffer_s = []
+					buffer_a = []
+					buffer_r = []
+
+
+
+				s = s_
+				total_step += 1
+
+				if done:
+					# put running reward of every step into GLOBAL_RUNNING_R
+					if len(GLOBAL_RUNNING_R) == 0:  # record running episode reward
+                        GLOBAL_RUNNING_R.append(ep_r)
+                    else:
+                        GLOBAL_RUNNING_R.append(0.9 * GLOBAL_RUNNING_R[-1] + 0.1 * ep_r)
+                    print(
+                        self.name,
+                        "Ep:", GLOBAL_EP,
+                        "| Ep_r: %i" % GLOBAL_RUNNING_R[-1],
+                          )
+                    GLOBAL_EP += 1
+                    break
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+
+
 
 
 
