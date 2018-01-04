@@ -301,16 +301,16 @@ class Worker(object):
 				if done:
 					# put running reward of every step into GLOBAL_RUNNING_R
 					if len(GLOBAL_RUNNING_R) == 0:  # record running episode reward
-                        GLOBAL_RUNNING_R.append(ep_r)
-                    else:
-                        GLOBAL_RUNNING_R.append(0.9 * GLOBAL_RUNNING_R[-1] + 0.1 * ep_r)
-                    print(
-                        self.name,
-                        "Ep:", GLOBAL_EP,
-                        "| Ep_r: %i" % GLOBAL_RUNNING_R[-1],
-                          )
-                    GLOBAL_EP += 1
-                    break
+                        			GLOBAL_RUNNING_R.append(ep_r)
+                    			else:
+                       		 		GLOBAL_RUNNING_R.append(0.9 * GLOBAL_RUNNING_R[-1] + 0.1 * ep_r)
+                    			print(
+                        			self.name,
+                        			"Ep:", GLOBAL_EP,
+                        			"| Ep_r: %i" % GLOBAL_RUNNING_R[-1],
+                          			)
+                   			GLOBAL_EP += 1
+                    			break
 
 
 
