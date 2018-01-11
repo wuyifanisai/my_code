@@ -1,10 +1,8 @@
-'''
+/*
 Spark-MLlib实例——逻辑回归，应用于二元分类的情况，这里以垃圾邮件分类为例，即是否为垃圾邮件两种情况。
-
 1、垃圾邮件分类，使用Spark-MLlib中的两个函数： 
 1）HashingTF： 从文本数据构建词频（term frequency）特征向量
 2）LogisticRegressionWithSGD： 使用随机梯度下降法（Stochastic Gradient Descent）,实现逻辑回归。
-
 2、训练原数据集
 垃圾邮件例子 spam.txt
 [plain] view plain copy
@@ -13,7 +11,6 @@ Get Viagra real cheap!  Send money right away to ...
 Oh my gosh you can be really strong too with these drugs found in the rainforest. Get them cheap right now ...  
 YOUR COMPUTER HAS BEEN INFECTED!  YOU MUST RESET YOUR PASSWORD.  Reply to this email with your password and SSN ...  
 THIS IS NOT A SCAM!  Send money and get access to awesome stuff really cheap and never have to ...  
-
 非垃圾邮件例子 normal.txt
 [plain] view plain copy
 Dear Spark Learner, Thanks so much for attending the Spark Summit 2014!  Check out videos of talks from the summit at ...  
@@ -29,7 +26,8 @@ Summit demo got whoops from audience!  Had to let you know. --Joe
 3、垃圾邮件分类器
 
 [java] view plain copy
-'''
+*/
+
 import org.apache.spark.{ SparkConf, SparkContext }  
 import org.apache.spark.mllib.classification.LogisticRegressionWithSGD  
 import org.apache.spark.mllib.feature.HashingTF  
@@ -94,8 +92,9 @@ object MLlib {
   
     sc.stop()  
   }  
-}  
-'''
+} 
+
+/*
 分析结果：
 [plain] view plain copy
 Prediction for positive test example: 1.0  
@@ -107,4 +106,4 @@ posTest4Example for negative test example: 0.0
 posTest5Example for negative test example: 1.0  
 
 1 即为 垃圾邮件， 0 为正常邮件。
-'''
+*/
