@@ -1,16 +1,5 @@
 // this is a simple: using spark mllib pipeline to solve a regression problem
 //
-/*
-Recently I had to work on a Machine Learning problem for class and found 
-a good opportunity for a Spark Tutorial. Using store sales from Rossmann 
-found on kaggle, we are going to set up a machine learning pipeline to 
-cover everything from the preprocessing all the way to making and saving 
-predictions. In a sense, this is a "full-stack" machine learning project
- that's probably fairly similar to something we might do in the real world.
-  Spark's ML Pipelines API is going to make it very easy for us to do this.
-   You can follow along with the code on my github or below.
-
-*/
 
 import org.apache.log4j.{Logger}
 //core and SparkSQL
@@ -263,7 +252,7 @@ def fitModel(tvs:CrossValidator, data:DataFrame) = {
 }
 
 
-
+//###############################################################################################
 def main(args: Array[String]): Unit = {
 
 //val conf = new SparkConf().setAppName("pipeline_regression")
@@ -272,15 +261,82 @@ val sqlContext = new SQLContext(sc)
 
 //============== reading data ==========================
 println("begin read train data !")
-val dt = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
-val trainRaw = dt.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
+val dt1 = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
+val trainRaw = dt1.map(line => line.split(","))
+val train = trainRaw.map(x => R_train(
+										x(0).toDouble,
+										x(1).toDouble,
+										x(2).toDouble,
+										x(3).toInt,
+										x(4).toInt,
+										x(5).toInt,
+										x(6).toInt,
+										x(7).toString,
+										x(8).toString
+										)
+)
+
+//val trainRaw = dt1.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 println("reading train data is over !")
 
 println("begin read test data !")
-val dt = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
-val testRaw = dt.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
+val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
+val testRaw = dt2.map(line => line.split(","))
+val test = testRaw.map(x => R_test(
+										x(0).toDouble,
+										x(1).toDouble,
+										x(2).toDouble,
+										x(3).toInt,
+										x(4).toInt,
+										x(5).toInt,
+										x(6).toString,
+										x(7).toString
+										)
+)
+
+//val testRaw = dt2.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 println("reading test data is over !")
-testRaw.collect()
+
+// transfrom RDD into dataFrame--------------------
+import sqlContext.implicits._
+
+val train_data = train.toDF()
+val test_data = test.toDF()
+
+train_data.registerTempTable("table_train")
+test_data.registerTempTable("table_test")
+
+// using sql to get the data we want from table
+val train_data_sql = sqlContext.sql("""SELECT 
+                Double(Sales) label, 
+                Double(Store) Store, 
+                int(Open) Open, 
+                Double(DayOfWeek) DayOfWeek,
+                StateHoliday, 
+                SchoolHoliday, 
+                (Double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
+            FROM table_train
+          """).na.drop()
+
+val test_Data_sql = sqlContext.sql("""SELECT
+                      Id, 
+                      Double(Store) Store, int(Open) Open, 
+                      Double(DayOfWeek) DayOfWeek, 
+                      StateHoliday,
+                      SchoolHoliday, 
+                      (Double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
+                    FROM table_test
+                    WHERE !(
+                        ISNULL(Id) OR 
+                        ISNULL(Store) OR 
+                        ISNULL(Open) OR 
+                        ISNULL(DayOfWeek) OR 
+                        ISNULL(StateHoliday) OR 
+                        ISNULL(SchoolHoliday)
+                      )
+                  """).na.drop() // weird things happen if you don't filter out the null values manually
+
+
 
 // ================== main step ======================
 
@@ -299,9 +355,11 @@ val Array(testRaw, testData) = loadKaggleTestData(sqlContext)
 val linearTvs = preppedLRPipeline()
 // The linear Regression Pipeline
 
-println("evaluating linear regression")
-val lrModel = fitModel(linearTvs, trainRaw)
 
+
+println("evaluating linear regression")
+val lrModel = fitModel(linearTvs, train_data_sql)
+/*
 println("Generating kaggle predictions")
 val lrOut = lrModel.transform(testRaw) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","Sales") //rename the column
@@ -311,10 +369,36 @@ val lrOut = lrModel.transform(testRaw) // transform is predicting in the sklearn
 println("Saving kaggle predictions")
 
 savePredictions(lrOut, testRaw)
+*/
+
+}
+
 
 
 }
 
+case class R_train(
+Store:Double,
+DayOfWeek:Double,
+DayOfMonth:Double,
+Sales:Int,
+Customers:Int,
+Open:Int,
+Promo:Int,
+StateHoliday:String,
+SchoolHoliday:String
+)
+
+case class R_test(
+Store:Double,
+DayOfWeek:Double,
+DayOfMonth:Double,
+Customers:Int,
+Open:Int,
+Promo:Int,
+StateHoliday:String,
+SchoolHoliday:String
+)
 
 
-}
+
