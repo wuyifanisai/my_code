@@ -3,7 +3,7 @@
 
 import org.apache.log4j.{Logger}
 //core and SparkSQL
-
+import org.apache.log4j.Level
 import org.apache.spark.{SparkConf, SparkContext}
 // Spark config
 
@@ -41,42 +41,50 @@ import org.apache.spark.mllib.evaluation.RegressionMetrics
 
 object pipeline {
 
-
+/*
 val stateHolidayIndexer = new StringIndexer()
   .setInputCol("StateHoliday")
   .setOutputCol("StateHolidayIndex")
+  */
 val schoolHolidayIndexer = new StringIndexer()
   .setInputCol("SchoolHoliday")
   .setOutputCol("SchoolHolidayIndex")
 
 //Convert numerical based categorical features(in one column) to numerical continuous features 
 //(one column per category) /increasing sparsity/
+  
+  /*
 val stateHolidayEncoder = new OneHotEncoder()
   .setInputCol("StateHolidayIndex")
   .setOutputCol("StateHolidayVec")
+  */
 val schoolHolidayEncoder = new OneHotEncoder()
   .setInputCol("SchoolHolidayIndex")
   .setOutputCol("SchoolHolidayVec")
+/*
 val dayOfMonthEncoder = new OneHotEncoder()
   .setInputCol("DayOfMonth")
 .setOutputCol("DayOfMonthVec")
+*/
 val dayOfWeekEncoder = new OneHotEncoder()
   .setInputCol("DayOfWeek")
 .setOutputCol("DayOfWeekVec")
+/*
 val storeEncoder = new OneHotEncoder()
   .setInputCol("Store")
   .setOutputCol("StoreVec")
+*/
 
 // all the features would transformed to one-hot features
 
 //assemble all of our vectors together into one vector to input into our model.
 val assembler = new VectorAssembler()
   .setInputCols(Array(
-              "StoreVec", 
+              //"StoreVec", 
               "DayOfWeekVec", 
               "Open",
-              "DayOfMonthVec", 
-              "StateHolidayVec", 
+              //"DayOfMonthVec", 
+              //"StateHolidayVec", 
               "SchoolHolidayVec"
             )
         )
@@ -116,13 +124,13 @@ def preppedLRPipeline():CrossValidator = {
 
   val pipeline = new Pipeline()
     .setStages(Array(                   // put all the preprocessing before and model into the pipeline
-            stateHolidayIndexer, 
+            //stateHolidayIndexer, 
             schoolHolidayIndexer,
-              stateHolidayEncoder, 
+              //stateHolidayEncoder, 
               schoolHolidayEncoder, 
-              storeEncoder,
+              //storeEncoder,
               dayOfWeekEncoder, 
-              dayOfMonthEncoder,
+              //dayOfMonthEncoder,
               assembler, 
               lr  // the last thing is the model
               )
@@ -138,66 +146,6 @@ def preppedLRPipeline():CrossValidator = {
 }
 
 
-// ---------------------load the data using hive --------------------
-// use the hive select tool to get the data from file
-
-// train data
-def loadTrainingData(sqlContext:SQLContext):DataFrame = {  //return a DataFrame
-  
-  val trainRaw = sqlContext
-    .read.format("com.databricks.spark.csv") 
-    .option("header", "true")
-    .load("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv")
-    //.repartition(6)
-
-  sqlContext.sql("""SELECT 
-                double(Sales) label, 
-                double(Store) Store, 
-                int(Open) Open, 
-                double(DayOfWeek) DayOfWeek,
-                StateHoliday, 
-                SchoolHoliday, 
-                (double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
-            FROM raw_training_data
-          """).na.drop()
-}
-
-
-// test data
-def loadKaggleTestData(sqlContext:SQLContext) = {
-  val testRaw = sqlContext //testRaw is stored in the table which can be selected
-    .read.format("com.databricks.spark.csv")
-    .option("header", "true")
-    .load("~/workspace/kaggle_rossmann/test.csv")
-    .repartition(6)
-
-  testRaw.registerTempTable("raw_test_data")
-
-  val testData = sqlContext.sql("""SELECT
-                      Id, 
-                      double(Store) Store, int(Open) Open, 
-                      double(DayOfWeek) DayOfWeek, 
-                      StateHoliday,
-                      SchoolHoliday, 
-                      (double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
-                    FROM raw_test_data
-                    WHERE !(
-                        ISNULL(Id) OR 
-                        ISNULL(Store) OR 
-                        ISNULL(Open) OR 
-                        ISNULL(DayOfWeek) OR 
-                        ISNULL(StateHoliday) OR 
-                        ISNULL(SchoolHoliday)
-                      )
-                  """).na.drop() // weird things happen if you don't filter out the null values manually
-
-  Array(testRaw, testData)  //return something,testRaw is the data(table) from the file, testData is the data selected from table
-  // got to hold onto testRaw so we can make sure
-  // to have all the prediction IDs to submit to kaggle
-}
-
-
-
 // -------------------- save predictions --------------------------------------
 def savePredictions(predictions:DataFrame, testRaw:DataFrame) = {
   val tdOut = testRaw
@@ -207,11 +155,8 @@ def savePredictions(predictions:DataFrame, testRaw:DataFrame) = {
     .select("Id", "Sales")
     .na.fill(0:Double) // some of our inputs were null so we have to
                        // fill these with something
-  tdOut
-    .coalesce(1) //no shuffle,put it into onr block
-    .write.format("com.databricks.spark.csv")
-    .option("header", "true")
-    .save("~/workspace/kaggle_rossmann/linear_regression_predictions.csv")
+  tdOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions.csv")
+  
 }
 
 
@@ -251,10 +196,19 @@ def fitModel(tvs:CrossValidator, data:DataFrame) = {
   model //return the model with best parameters 
 }
 
+def SetLogger() = {
+    Logger.getLogger("org").setLevel(Level.OFF)
+    Logger.getLogger("com").setLevel(Level.OFF)
+    System.setProperty("spark.ui.showConsoleProgress", "false")
+    Logger.getRootLogger().setLevel(Level.OFF);
+  }
 
 //###############################################################################################
 def main(args: Array[String]): Unit = {
 
+  SetLogger()
+  
+  
 //val conf = new SparkConf().setAppName("pipeline_regression")
 val sc = new SparkContext(new SparkConf().setAppName("App").setMaster("local[4]"))
 val sqlContext = new SQLContext(sc)
@@ -264,14 +218,14 @@ println("begin read train data !")
 val dt1 = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
 val trainRaw = dt1.map(line => line.split(","))
 val train = trainRaw.map(x => R_train(
-										x(0).toDouble,
-										x(1).toDouble,
-										x(2).toDouble,
-										x(3).toInt,
+										//x(0).toDouble,
+										x(1).toInt,
+										x(2).toString,
+										x(3).toDouble,
 										x(4).toInt,
 										x(5).toInt,
 										x(6).toInt,
-										x(7).toString,
+										//x(7).toString,
 										x(8).toString
 										)
 )
@@ -283,14 +237,15 @@ println("begin read test data !")
 val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
 val testRaw = dt2.map(line => line.split(","))
 val test = testRaw.map(x => R_test(
-										x(0).toDouble,
-										x(1).toDouble,
+                   					 	x(0).toInt,
+                   					 	//x(1).toDouble,
 										x(2).toDouble,
-										x(3).toInt,
 										x(4).toInt,
 										x(5).toInt,
-										x(6).toString,
+										//x(5).toInt,
 										x(7).toString
+										
+										
 										)
 )
 
@@ -308,68 +263,49 @@ test_data.registerTempTable("table_test")
 
 // using sql to get the data we want from table
 val train_data_sql = sqlContext.sql("""SELECT 
-                Double(Sales) label, 
-                Double(Store) Store, 
-                int(Open) Open, 
-                Double(DayOfWeek) DayOfWeek,
-                StateHoliday, 
-                SchoolHoliday, 
-                (Double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
+                Sales label, 
+                Open Open, 
+                DayOfWeek DayOfWeek,
+                SchoolHoliday
             FROM table_train
+            Limit 100
           """).na.drop()
+println("train data selection is over !")
 
-val test_Data_sql = sqlContext.sql("""SELECT
-                      Id, 
-                      Double(Store) Store, int(Open) Open, 
-                      Double(DayOfWeek) DayOfWeek, 
-                      StateHoliday,
-                      SchoolHoliday, 
-                      (Double(regexp_extract(Date, '\\d+-\\d+-(\\d+)', 1))) DayOfMonth
+val test_data_sql = sqlContext.sql("""SELECT
+                     Id, 
+                      (Open) Open, 
+                      (DayOfWeek) DayOfWeek, 
+                      SchoolHoliday
                     FROM table_test
-                    WHERE !(
-                        ISNULL(Id) OR 
-                        ISNULL(Store) OR 
-                        ISNULL(Open) OR 
-                        ISNULL(DayOfWeek) OR 
-                        ISNULL(StateHoliday) OR 
-                        ISNULL(SchoolHoliday)
-                      )
+              
+                   LIMIT 50
                   """).na.drop() // weird things happen if you don't filter out the null values manually
-
-
-
+println("test data selection is over !")
+test_data_sql.rdd.foreach(row =>println(row)) 
+println("over!")
 // ================== main step ======================
-
-
-/*
-println("reading train data")
-val data = loadTrainingData(sqlContext)
-// get the training data
-
-println("reading test data")
-val Array(testRaw, testData) = loadKaggleTestData(sqlContext)
-// get the test data
-*/
 
 
 val linearTvs = preppedLRPipeline()
 // The linear Regression Pipeline
-
+println("finish building  pipleine")
 
 
 println("evaluating linear regression")
 val lrModel = fitModel(linearTvs, train_data_sql)
-/*
+println("finish training fitting !")
+
 println("Generating kaggle predictions")
-val lrOut = lrModel.transform(testRaw) // transform is predicting in the sklearn
+val lrOut = lrModel.transform(test_data_sql) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","Sales") //rename the column
   .withColumnRenamed("Id","PredId")
   .select("PredId", "Sales")
-
+lrOut.rdd.foreach(row => println(row))
 println("Saving kaggle predictions")
 
-savePredictions(lrOut, testRaw)
-*/
+savePredictions(lrOut, test_data_sql)
+
 
 }
 
@@ -378,27 +314,24 @@ savePredictions(lrOut, testRaw)
 }
 
 case class R_train(
-Store:Double,
+//Store:Int,
 DayOfWeek:Double,
-DayOfMonth:Double,
-Sales:Int,
+Date:String,
+Sales:Double,
 Customers:Int,
 Open:Int,
 Promo:Int,
-StateHoliday:String,
+//StateHoliday:String,
 SchoolHoliday:String
 )
 
 case class R_test(
-Store:Double,
+Id:Int,
+//Store:Int,
 DayOfWeek:Double,
-DayOfMonth:Double,
-Customers:Int,
+//DayOfMonth:Double,
 Open:Int,
 Promo:Int,
-StateHoliday:String,
+//StateHoliday:String,
 SchoolHoliday:String
 )
-
-
-
