@@ -215,11 +215,13 @@ val sc = new SparkContext(new SparkConf().setAppName("App").setMaster("local[4]"
 val sqlContext = new SQLContext(sc)
 
 //============== reading data ==========================
+
+// reading train data----------------------
 println("begin read train data !")
 val dt1 = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
 val trainRaw = dt1.map(line => line.split(","))
 val train = trainRaw.map(x => R_train(
-										//x(0).toDouble,
+										x(0).toInt,
 										x(1).toInt,
 										x(2).toString,
 										x(3).toDouble,
@@ -230,19 +232,16 @@ val train = trainRaw.map(x => R_train(
 										x(8).toString
 										)
 )
-
-
-
 //val trainRaw = dt1.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
-println("reading train data is over !")
+println("finish reading train data!")
 
 
-
-println("begin read test data !")
+// reading test data--------------------------------
+println("begin to read test data !")
 val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
 val testRaw = dt2.map(line => line.split(","))
 val test = testRaw.map(x => R_train(
-										//x(0).toDouble,
+										x(0).toInt,
 										x(1).toInt,
 										x(2).toString,
 										x(3).toDouble,
@@ -253,8 +252,26 @@ val test = testRaw.map(x => R_train(
 										x(8).toString
 										)
 )
-println("reading test data is over !")
+println("finish  reading test data !")
 
+
+//reading store data -------------------------
+println("begin to read store data")
+val dt3= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/store.csv", 1)
+val storeRaw = dt3.map(line => line.split(","))
+val store = storeRaw.map(x => store_info(
+										x(0).toInt,
+										x(1).toString,
+										x(2).toString,
+										x(3).toInt,
+										x(4).toInt,
+										x(5).toInt,
+										x(6).toInt,
+										x(7).toInt,
+										x(8).toInt
+							
+))
+println("finish reading store data !")
 
 
 // transfrom RDD into dataFrame--------------------
@@ -262,13 +279,16 @@ import sqlContext.implicits._
 
 val train_data = train.toDF()
 val test_data = test.toDF()
+val store_data = store.toDF()
 
 train_data.registerTempTable("table_train")
 test_data.registerTempTable("table_test")
+store_data.registerTempTable("store_table")
 
-// using sql to get the data we want from table
+// using sql to get the data we want from table-------
 val train_data_sql = sqlContext.sql("""
 			SELECT 
+                Store,
                 Sales label, 
                 Open Open, 
                 DayOfWeek DayOfWeek,
@@ -276,18 +296,40 @@ val train_data_sql = sqlContext.sql("""
             FROM table_train
             Limit 100
           """).na.drop()
-println("train data selection is over !")
+train_data_sql.show(10)
 
 val test_data_sql = sqlContext.sql("""
 			SELECT 
+                Store,
                 Sales label, 
                 Open Open, 
                 DayOfWeek DayOfWeek,
                 SchoolHoliday
             FROM table_test
           """).na.drop()
-println("test data selection is over !")
+test_data_sql.show(20)
 
+val store_data_sql = sqlContext.sql("""
+			SELECT *
+            FROM store_table
+          """).na.drop()
+
+store_data_sql.show(20)
+
+//============== try to combine train data and store data together ==========
+store_data_sql.registerTempTable("s")
+train_data_sql.registerTempTable("t")
+val store_train_data_sql = sqlContext.sql("""
+			SELECT s.Store, t.Store
+            FROM s ,   t
+            WHERE s.Store = t.Store
+          """).na.drop()
+
+store_train_data_sql.show(20)
+
+
+
+/*
 
 
 // ================== main step ======================
@@ -311,6 +353,9 @@ println("Saving kaggle predictions")
 //savePredictions(lrOut, test_data_sql)
 lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
 println("saveing is done !")
+
+*/
+
 }
 
 
@@ -318,7 +363,7 @@ println("saveing is done !")
 }
 
 case class R_train(
-//Store:Int,
+Store:Int,
 DayOfWeek:Double,
 Date:String,
 Sales:Double,
@@ -329,4 +374,14 @@ Promo:Int,
 SchoolHoliday:String
 )
 
-
+case class store_info(
+Store:Int,
+StoreType:String,	
+Assortment:String,
+CompetitionDistance: Int,
+CompetitionOpenSinceMonth:Int,	
+CompetitionOpenSinceYear:Int,
+Promo2:Int,
+Promo2SinceWeek:Int,
+Promo2SinceYear:Int
+)
