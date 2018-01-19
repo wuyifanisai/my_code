@@ -317,12 +317,13 @@ val store_data_sql = sqlContext.sql("""
 store_data_sql.show(20)
 
 //============== try to combine train data and store data together ==========
-store_data_sql.registerTempTable("s")
-train_data_sql.registerTempTable("t")
+
+
+
 val store_train_data_sql = sqlContext.sql("""
-			SELECT s.Store, t.Store
-            FROM s ,   t
-            WHERE s.Store = t.Store
+			SELECT s.*,t.Sales label,t.Open,t.DayOfWeek,t.SchoolHoliday
+            FROM table_train t inner join store_table s on s.Store =t.Store
+       
           """).na.drop()
 
 store_train_data_sql.show(20)
