@@ -155,7 +155,8 @@ def savePredictions(predictions:DataFrame, testRaw:DataFrame) = {
     .select("Id", "Sales")
     .na.fill(0:Double) // some of our inputs were null so we have to
                        // fill these with something
-  tdOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions.csv")
+  tdOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_02.csv")
+  tdOut.rdd.foreach(x=>println(x))
   
 }
 
@@ -230,27 +231,31 @@ val train = trainRaw.map(x => R_train(
 										)
 )
 
+
+
 //val trainRaw = dt1.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 println("reading train data is over !")
+
+
 
 println("begin read test data !")
 val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
 val testRaw = dt2.map(line => line.split(","))
-val test = testRaw.map(x => R_test(
-                   					 	x(0).toInt,
-                   					 	//x(1).toDouble,
-										x(2).toDouble,
+val test = testRaw.map(x => R_train(
+										//x(0).toDouble,
+										x(1).toInt,
+										x(2).toString,
+										x(3).toDouble,
 										x(4).toInt,
 										x(5).toInt,
-										//x(5).toInt,
-										x(7).toString
-										
-										
+										x(6).toInt,
+										//x(7).toString,
+										x(8).toString
 										)
 )
-
-//val testRaw = dt2.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 println("reading test data is over !")
+
+
 
 // transfrom RDD into dataFrame--------------------
 import sqlContext.implicits._
@@ -262,7 +267,8 @@ train_data.registerTempTable("table_train")
 test_data.registerTempTable("table_test")
 
 // using sql to get the data we want from table
-val train_data_sql = sqlContext.sql("""SELECT 
+val train_data_sql = sqlContext.sql("""
+			SELECT 
                 Sales label, 
                 Open Open, 
                 DayOfWeek DayOfWeek,
@@ -272,20 +278,19 @@ val train_data_sql = sqlContext.sql("""SELECT
           """).na.drop()
 println("train data selection is over !")
 
-val test_data_sql = sqlContext.sql("""SELECT
-                     Id, 
-                      (Open) Open, 
-                      (DayOfWeek) DayOfWeek, 
-                      SchoolHoliday
-                    FROM table_test
-              
-                   LIMIT 50
-                  """).na.drop() // weird things happen if you don't filter out the null values manually
+val test_data_sql = sqlContext.sql("""
+			SELECT 
+                Sales label, 
+                Open Open, 
+                DayOfWeek DayOfWeek,
+                SchoolHoliday
+            FROM table_test
+          """).na.drop()
 println("test data selection is over !")
-test_data_sql.rdd.foreach(row =>println(row)) 
-println("over!")
-// ================== main step ======================
 
+
+
+// ================== main step ======================
 
 val linearTvs = preppedLRPipeline()
 // The linear Regression Pipeline
@@ -297,16 +302,15 @@ val lrModel = fitModel(linearTvs, train_data_sql)
 println("finish training fitting !")
 
 println("Generating kaggle predictions")
-val lrOut = lrModel.transform(test_data_sql) // transform is predicting in the sklearn
+val lrOut = lrModel.transform(train_data_sql) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","Sales") //rename the column
-  .withColumnRenamed("Id","PredId")
-  .select("PredId", "Sales")
+
 lrOut.rdd.foreach(row => println(row))
 println("Saving kaggle predictions")
 
-savePredictions(lrOut, test_data_sql)
-
-
+//savePredictions(lrOut, test_data_sql)
+lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
+println("saveing is done !")
 }
 
 
@@ -325,13 +329,4 @@ Promo:Int,
 SchoolHoliday:String
 )
 
-case class R_test(
-Id:Int,
-//Store:Int,
-DayOfWeek:Double,
-//DayOfMonth:Double,
-Open:Int,
-Promo:Int,
-//StateHoliday:String,
-SchoolHoliday:String
-)
+
