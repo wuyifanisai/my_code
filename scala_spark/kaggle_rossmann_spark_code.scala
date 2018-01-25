@@ -18,7 +18,7 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.mllib.linalg.Vectors
 
-import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder}
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler}
 // ML Feature Creation
 
 import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
@@ -39,54 +39,126 @@ import org.apache.spark.mllib.evaluation.RegressionMetrics
 // evaluation for regression model
 
 
-object pipeline {
 
 /*
-val stateHolidayIndexer = new StringIndexer()
-  .setInputCol("StateHoliday")
-  .setOutputCol("StateHolidayIndex")
-  */
-val schoolHolidayIndexer = new StringIndexer()
+show some of the train_store data
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
+|Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
+|   31|        d|         c|               9800|                        7|                    2012|              0|           2010|     0| 7248.0|   1|      5.0|            1|
+|  231|        d|         c|               3840|                       10|                    2008|             39|           2010|     1| 8353.0|   1|      5.0|            0|
+|  431|        d|         c|               4520|                        0|                    2010|              0|           2010|     0|12369.0|   1|      5.0|            1|
+|  631|        d|         c|               2870|                        0|                    2010|             35|           2012|     1| 7428.0|   1|      5.0|            1|
+|  831|        a|         a|                800|                        6|                    2007|              0|           2010|     0|15152.0|   1|      5.0|            1|
+| 1031|        d|         a|                590|                        5|                    2001|              0|           2010|     0| 6014.0|   1|      5.0|            1|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
+
+show some of the test_store data
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
+|Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
+|  891|        a|         c|                350|                        0|                    2010|             31|           2013|     1|10821.0|   1|      1.0|            0|
+|  892|        a|         a|              19370|                        4|                    2002|              0|           2010|     0|13186.0|   1|      1.0|            0|
+|  893|        a|         a|                130|                        0|                    2010|              1|           2013|     1| 8121.0|   1|      1.0|            0|
+|  894|        a|         a|                190|                       11|                    2012|              0|           2010|     0|13713.0|   1|      1.0|            0|
+|  895|        a|         c|               4150|                        0|                    2010|              0|           2010|     0|11425.0|   1|      1.0|            0|
+|  896|        a|         c|                170|                        9|                    2012|              0|           2010|     0| 7813.0|   1|      1.0|            0|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+*/
+
+
+
+object pipeline {
+
+//=========================  StoreType dealing  =====================================
+// StoreType : string => Index
+val StoreTypeIndexer = new StringIndexer()
+	.setInputCol("StoreType")
+	.setOutputCol("StoreTypeIndex")
+
+// StoreTypeIndex : one-hot
+val StoreTypeIndexEncoder = new OneHotEncoder()
+  .setInputCol("StoreTypeIndex")
+  .setOutputCol("StoreTypeVec")
+
+// =========================  Assortment dealing  =====================================
+val AssortmentIndexer = new StringIndexer()
+	.setInputCol("Assortment")
+	.setOutputCol("AssortmentIndex")
+
+// AssortmentIndex : one-hot
+val AssortmentIndexEncoder = new OneHotEncoder()
+  .setInputCol("AssortmentIndex")
+  .setOutputCol("AssortmentVec")
+
+//================================ CompetitionDistance dealing =========================
+// StandardScaler for CompetitionDistance
+// do it in the main function 
+
+// ================================ CompetitionOpenSinceMonth dealing ===============
+//one-hot for CompetitionOpenSinceMonth
+val CompetitionOpenSinceMonthEncoder = new OneHotEncoder()
+  .setInputCol("CompetitionOpenSinceMonth")
+  .setOutputCol("CompetitionOpenSinceMonthVec")
+
+// ============================ CompetitionOpenSinceYear dealing ===============
+//one-hot for CompetitionOpenSinceYear
+val CompetitionOpenSinceYearEncoder = new OneHotEncoder()
+  .setInputCol("CompetitionOpenSinceYear")
+  .setOutputCol("CompetitionOpenSinceYearVec")	
+
+//============================ Promo2SinceWeek dealing ===================
+// USE ORIGINAL DATA
+
+// ========================== Promo2SinceYear dealing ==============
+//one-hot for Promo2SinceYear
+val Promo2SinceYearEncoder = new OneHotEncoder()
+  .setInputCol("Promo2SinceYear")
+  .setOutputCol("Promo2SinceYearVec")	
+
+// ============================ Promo2 dealing =========================
+// USE ORIGINAL DATA
+
+// =============== Open dealing ================
+// open : one-hot
+val OpenEncoder = new OneHotEncoder()
+  .setInputCol("Open")
+  .setOutputCol("OpenVec")
+
+//============================ schoolHoliday dealing ======================
+// schoolHoliday : string => Index 
+val SchoolHolidayIndexer = new StringIndexer()
   .setInputCol("SchoolHoliday")
   .setOutputCol("SchoolHolidayIndex")
 
-//Convert numerical based categorical features(in one column) to numerical continuous features 
-//(one column per category) /increasing sparsity/
-  
-  /*
-val stateHolidayEncoder = new OneHotEncoder()
-  .setInputCol("StateHolidayIndex")
-  .setOutputCol("StateHolidayVec")
-  */
-val schoolHolidayEncoder = new OneHotEncoder()
+// SchoolHolidayIndex : one-hot
+val SchoolHolidayEncoder = new OneHotEncoder()
   .setInputCol("SchoolHolidayIndex")
   .setOutputCol("SchoolHolidayVec")
-/*
-val dayOfMonthEncoder = new OneHotEncoder()
-  .setInputCol("DayOfMonth")
-.setOutputCol("DayOfMonthVec")
-*/
-val dayOfWeekEncoder = new OneHotEncoder()
+
+
+// ================================ DayOfWeek dealing ======================
+// DayOfWeek: one-hot
+val DayOfWeekEncoder = new OneHotEncoder()
   .setInputCol("DayOfWeek")
-.setOutputCol("DayOfWeekVec")
-/*
-val storeEncoder = new OneHotEncoder()
-  .setInputCol("Store")
-  .setOutputCol("StoreVec")
-*/
+  .setOutputCol("DayOfWeekVec")
 
-// all the features would transformed to one-hot features
+// ===============================store dealing =========================
+// seems it is usefulless
 
-//assemble all of our vectors together into one vector to input into our model.
-val assembler = new VectorAssembler()
+
+//=============================== assemble all the features =========================================
+val Assembler = new VectorAssembler()
   .setInputCols(Array(
-              //"StoreVec", 
-              "DayOfWeekVec", 
-              "Open",
-              //"DayOfMonthVec", 
-              //"StateHolidayVec", 
-              "SchoolHolidayVec"
-            )
+  						"StoreTypeVec",
+						"AssortmentVec",
+						"CompetitionDistancescaled",
+						"CompetitionOpenSinceMonthVec",
+						"CompetitionOpenSinceYearVec",
+						"Promo2SinceYearVec",
+						"OpenVec",
+						"SchoolHolidayVec",
+						"DayOfWeekVec"
+            		)
         )
   .setOutputCol("features")
 
@@ -124,17 +196,21 @@ def preppedLRPipeline():CrossValidator = {
 
   val pipeline = new Pipeline()
     .setStages(Array(                   // put all the preprocessing before and model into the pipeline
-            //stateHolidayIndexer, 
-            schoolHolidayIndexer,
-              //stateHolidayEncoder, 
-              schoolHolidayEncoder, 
-              //storeEncoder,
-              dayOfWeekEncoder, 
-              //dayOfMonthEncoder,
-              assembler, 
-              lr  // the last thing is the model
-              )
-        )
+            		StoreTypeIndexer,
+					StoreTypeIndexEncoder,
+					AssortmentIndexer,
+					AssortmentIndexEncoder,
+					CompetitionOpenSinceMonthEncoder,
+					CompetitionOpenSinceYearEncoder,
+					Promo2SinceYearEncoder,
+					OpenEncoder,
+					SchoolHolidayIndexer,
+					SchoolHolidayEncoder,
+					DayOfWeekEncoder,
+              		Assembler, 
+              		lr  // the last thing is the model
+                    )
+            )
 
   val tvs = new CrossValidator()  // put the [preprocessing, model], Evaluator, tuning, paramgrid together
     .setEstimator(pipeline) // here is something can be fit
@@ -204,7 +280,10 @@ def SetLogger() = {
     Logger.getRootLogger().setLevel(Level.OFF);
   }
 
-//###############################################################################################
+
+
+
+//############################################################ main function #####################################################################
 def main(args: Array[String]): Unit = {
 
   SetLogger()
@@ -214,10 +293,9 @@ def main(args: Array[String]): Unit = {
 val sc = new SparkContext(new SparkConf().setAppName("App").setMaster("local[4]"))
 val sqlContext = new SQLContext(sc)
 
-//============== reading data ==========================
+//====================================   reading data =========================================
 
-// reading train data----------------------
-println("begin read train data !")
+// reading train data----------------------------------------------------------------------
 val dt1 = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
 val trainRaw = dt1.map(line => line.split(","))
 val train = trainRaw.map(x => R_train(
@@ -233,11 +311,9 @@ val train = trainRaw.map(x => R_train(
 										)
 )
 //val trainRaw = dt1.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
-println("finish reading train data!")
 
 
-// reading test data--------------------------------
-println("begin to read test data !")
+// reading test data---------------------------------------------------------------------------
 val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
 val testRaw = dt2.map(line => line.split(","))
 val test = testRaw.map(x => R_train(
@@ -252,11 +328,9 @@ val test = testRaw.map(x => R_train(
 										x(8).toString
 										)
 )
-println("finish  reading test data !")
 
 
-//reading store data -------------------------
-println("begin to read store data")
+//reading store data -------------------------------------------------------------------------
 val dt3= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/store.csv", 1)
 val storeRaw = dt3.map(line => line.split(","))
 val store = storeRaw.map(x => store_info(
@@ -268,13 +342,10 @@ val store = storeRaw.map(x => store_info(
 										x(5).toInt,
 										x(6).toInt,
 										x(7).toInt,
-										x(8).toInt
-							
+										x(8).toInt						
 ))
-println("finish reading store data !")
 
-
-// transfrom RDD into dataFrame--------------------
+// transfrom RDD into dataFrame-----------------------------------------------------------------
 import sqlContext.implicits._
 
 val train_data = train.toDF()
@@ -282,10 +353,16 @@ val test_data = test.toDF()
 val store_data = store.toDF()
 
 train_data.registerTempTable("table_train")
-test_data.registerTempTable("table_test")
-store_data.registerTempTable("store_table")
+println("train data has been registered into TempTable ==> <table_train> ")
 
-// using sql to get the data we want from table-------
+test_data.registerTempTable("table_test")
+println("test data has been registered into TempTable ==> <table_test> ")
+
+store_data.registerTempTable("store_table")
+println("store data has been registered into TempTable ==> <table_store> ")
+
+// using sql to get the data we want from table--------------------------------------------------
+
 val train_data_sql = sqlContext.sql("""
 			SELECT 
                 Store,
@@ -296,73 +373,133 @@ val train_data_sql = sqlContext.sql("""
             FROM table_train
             Limit 100
           """).na.drop()
-train_data_sql.show(10)
+println("show some of the train data")
+train_data_sql.show(3)
+
 
 val test_data_sql = sqlContext.sql("""
 			SELECT 
                 Store,
-                Sales label, 
+                Sales actual_sale, 
                 Open Open, 
                 DayOfWeek DayOfWeek,
                 SchoolHoliday
             FROM table_test
           """).na.drop()
-test_data_sql.show(20)
+println("show some of the test data")
+test_data_sql.show(3)
+
 
 val store_data_sql = sqlContext.sql("""
 			SELECT *
             FROM store_table
           """).na.drop()
-
-store_data_sql.show(20)
-
-//============== try to combine train data and store data together ==========
+println("show some of the store data")
+store_data_sql.show(3)
 
 
+//========================================= try to combine train data and store data together =============================
 
 val store_train_data_sql = sqlContext.sql("""
-			SELECT s.*,t.Sales label,t.Open,t.DayOfWeek,t.SchoolHoliday
-            FROM table_train t inner join store_table s on s.Store =t.Store
+		SELECT 
+			s.Store,
+			s.StoreType,
+			s.Assortment,
+			if(s.CompetitionDistance = 999999, 0 , s.CompetitionDistance) CompetitionDistance,
+
+			if(s.CompetitionOpenSinceMonth = 999999, 0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+
+			if(s.CompetitionOpenSinceYear=999999, 2010, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+
+			if(s.Promo2SinceWeek = 999999, 0, s.Promo2SinceWeek ) Promo2SinceWeek,
+
+			if(s.Promo2SinceYear = 999999, 2010, s.Promo2SinceYear) Promo2SinceYear,
+
+			s.Promo2,
+			t.Sales label,
+			t.Open,
+			t.DayOfWeek,
+			t.SchoolHoliday
+
+        FROM table_train t inner join store_table s on s.Store =t.Store
        
           """).na.drop()
+println("show some of the train_store data")
+store_train_data_sql.show(5)
 
-store_train_data_sql.show(20)
+//================================================ try to combine test data and store data together ============================
 
+val store_test_data_sql = sqlContext.sql("""
+		SELECT 
+			s.Store,
+			s.StoreType,
+			s.Assortment,
+			if(s.CompetitionDistance = 999999, 0 , s.CompetitionDistance) CompetitionDistance,
+
+			if(s.CompetitionOpenSinceMonth = 999999, 0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+
+			if(s.CompetitionOpenSinceYear=999999, 2010, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+
+			if(s.Promo2SinceWeek = 999999, 0, s.Promo2SinceWeek ) Promo2SinceWeek,
+
+			if(s.Promo2SinceYear = 999999, 2010, s.Promo2SinceYear) Promo2SinceYear,
+			
+			s.Promo2,
+			t.Sales label,
+			t.Open,
+			t.DayOfWeek,
+			t.SchoolHoliday
+        FROM table_test t inner join store_table s on s.Store =t.Store
+       
+          """).na.drop()
+println("show some of the test_store data")
+store_test_data_sql.show(5)
+
+
+// ========================================== add some features dealing before pipeline =========================
+
+// do a StandardScaler for column named CompetitionDistance-------------------
+val CompetitionDistanceScaler = new StandardScaler()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistancescaled")
+  .setWithStd(true)
+  .setWithMean(true)
+// Compute summary statistics by fitting the StandardScaler.
+val scalerModel_train = CompetitionDistanceScaler.fit(store_train_data_sql)
+val scalerModel_test = CompetitionDistanceScaler.fit(store_test_data_sql)
+
+val store_train_data_sql_01= scalerModel_train.transform(store_train_data_sql)
+val store_test_data_sql_01= scalerModel_train.transform(store_test_data_sql)
+
+store_train_data_sql_01.show(10)
 
 
 /*
-
-
-// ================== main step ======================
-
+// ================================================ train of main step ======================================================
+// The linear Regression Pipeline ----------------------------------------
 val linearTvs = preppedLRPipeline()
-// The linear Regression Pipeline
-println("finish building  pipleine")
 
 
-println("evaluating linear regression")
-val lrModel = fitModel(linearTvs, train_data_sql)
+val lrModel = fitModel(linearTvs, store_train_data_sql)
+println("finish building pipeline !")
 println("finish training fitting !")
 
-println("Generating kaggle predictions")
-val lrOut = lrModel.transform(train_data_sql) // transform is predicting in the sklearn
-  .withColumnRenamed("prediction","Sales") //rename the column
+println("begin Generating kaggle predictions")
+val lrOut = lrModel.transform(store_train_data_sql) // transform is predicting in the sklearn
+  .withColumnRenamed("prediction","predict_Sales") //rename the column
 
 lrOut.rdd.foreach(row => println(row))
 println("Saving kaggle predictions")
-
 //savePredictions(lrOut, test_data_sql)
 lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
-println("saveing is done !")
-
+println("saving is done !")
 */
 
 }
-
-
-
 }
 
+
+// =====  the table form for change data from RDD into sql_table
 case class R_train(
 Store:Int,
 DayOfWeek:Double,
