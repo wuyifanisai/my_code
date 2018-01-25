@@ -18,7 +18,7 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.mllib.linalg.Vectors
 
-import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler}
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer}
 // ML Feature Creation
 
 import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
@@ -95,7 +95,11 @@ val CompetitionDistanceScaler = new StandardScaler()
   .setInputCol("CompetitionDistance")
   .setOutputCol("CompetitionDistancescaled")
   .setWithStd(true)
-  .setWithMean(true)
+  .setWithMean(false)
+
+val CompetitionDistanceNormalizer = new Normalizer()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistancescaled")
 
 // ================================ CompetitionOpenSinceMonth dealing ===============
 //one-hot for CompetitionOpenSinceMonth
@@ -154,7 +158,7 @@ val Assembler = new VectorAssembler()
   .setInputCols(Array(
   						"StoreTypeVec",
 						"AssortmentVec",
-						//"CompetitionDistancescaled",
+						"CompetitionDistancescaled",
 						"CompetitionOpenSinceMonthVec",
 						"CompetitionOpenSinceYearVec",
 						"Promo2SinceYearVec",
@@ -203,6 +207,7 @@ def preppedLRPipeline():CrossValidator = {
 					StoreTypeIndexEncoder,
 					AssortmentIndexer,
 					AssortmentIndexEncoder,
+					CompetitionDistanceNormalizer,
 					//CompetitionDistanceScaler,
 					CompetitionOpenSinceMonthEncoder,
 					CompetitionOpenSinceYearEncoder,
@@ -459,7 +464,7 @@ println("finish training fitting !")
 println("begin Generating kaggle predictions")
 val lrOut = lrModel.transform(store_train_data_sql) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","predict_Sales") //rename the column
-lrOut.rdd.foreach(row => println(row))
+lrOut.select("label","predict_Sales").rdd.foreach(row => println(row))
 println("Saving kaggle predictions")
 //savePredictions(lrOut, test_data_sql)
 lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
@@ -487,7 +492,7 @@ case class store_info(
 Store:Int,
 StoreType:String,	
 Assortment:String,
-CompetitionDistance: Double,
+CompetitionDistance: Int,
 CompetitionOpenSinceMonth:Double,	
 CompetitionOpenSinceYear:Double,
 Promo2:Double,
