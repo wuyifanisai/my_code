@@ -52,7 +52,6 @@ show some of the train_store data
 |  831|        a|         a|                800|                        6|                    2007|              0|           2010|     0|15152.0|   1|      5.0|            1|
 | 1031|        d|         a|                590|                        5|                    2001|              0|           2010|     0| 6014.0|   1|      5.0|            1|
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
-
 show some of the test_store data
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+
 |Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|
@@ -92,7 +91,11 @@ val AssortmentIndexEncoder = new OneHotEncoder()
 
 //================================ CompetitionDistance dealing =========================
 // StandardScaler for CompetitionDistance
-// do it in the main function 
+val CompetitionDistanceScaler = new StandardScaler()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistancescaled")
+  .setWithStd(true)
+  .setWithMean(true)
 
 // ================================ CompetitionOpenSinceMonth dealing ===============
 //one-hot for CompetitionOpenSinceMonth
@@ -151,7 +154,7 @@ val Assembler = new VectorAssembler()
   .setInputCols(Array(
   						"StoreTypeVec",
 						"AssortmentVec",
-						"CompetitionDistancescaled",
+						//"CompetitionDistancescaled",
 						"CompetitionOpenSinceMonthVec",
 						"CompetitionOpenSinceYearVec",
 						"Promo2SinceYearVec",
@@ -200,6 +203,7 @@ def preppedLRPipeline():CrossValidator = {
 					StoreTypeIndexEncoder,
 					AssortmentIndexer,
 					AssortmentIndexEncoder,
+					//CompetitionDistanceScaler,
 					CompetitionOpenSinceMonthEncoder,
 					CompetitionOpenSinceYearEncoder,
 					Promo2SinceYearEncoder,
@@ -405,24 +409,18 @@ val store_train_data_sql = sqlContext.sql("""
 			s.Store,
 			s.StoreType,
 			s.Assortment,
-			if(s.CompetitionDistance = 999999, 0 , s.CompetitionDistance) CompetitionDistance,
-
-			if(s.CompetitionOpenSinceMonth = 999999, 0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
-
-			if(s.CompetitionOpenSinceYear=999999, 2010, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
-
-			if(s.Promo2SinceWeek = 999999, 0, s.Promo2SinceWeek ) Promo2SinceWeek,
-
-			if(s.Promo2SinceYear = 999999, 2010, s.Promo2SinceYear) Promo2SinceYear,
-
+			if(s.CompetitionDistance = 999999.0, 0.0 , s.CompetitionDistance) CompetitionDistance,
+			if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+			if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+			if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
+			if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
 			s.Promo2,
 			t.Sales label,
 			t.Open,
 			t.DayOfWeek,
 			t.SchoolHoliday
-
         FROM table_train t inner join store_table s on s.Store =t.Store
-       
+        Limit 10000
           """).na.drop()
 println("show some of the train_store data")
 store_train_data_sql.show(5)
@@ -434,16 +432,11 @@ val store_test_data_sql = sqlContext.sql("""
 			s.Store,
 			s.StoreType,
 			s.Assortment,
-			if(s.CompetitionDistance = 999999, 0 , s.CompetitionDistance) CompetitionDistance,
-
-			if(s.CompetitionOpenSinceMonth = 999999, 0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
-
-			if(s.CompetitionOpenSinceYear=999999, 2010, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
-
-			if(s.Promo2SinceWeek = 999999, 0, s.Promo2SinceWeek ) Promo2SinceWeek,
-
-			if(s.Promo2SinceYear = 999999, 2010, s.Promo2SinceYear) Promo2SinceYear,
-			
+			if(s.CompetitionDistance = 999999.0, 0.0 , s.CompetitionDistance) CompetitionDistance,
+			if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+			if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+			if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
+			if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
 			s.Promo2,
 			t.Sales label,
 			t.Open,
@@ -456,44 +449,22 @@ println("show some of the test_store data")
 store_test_data_sql.show(5)
 
 
-// ========================================== add some features dealing before pipeline =========================
 
-// do a StandardScaler for column named CompetitionDistance-------------------
-val CompetitionDistanceScaler = new StandardScaler()
-  .setInputCol("CompetitionDistance")
-  .setOutputCol("CompetitionDistancescaled")
-  .setWithStd(true)
-  .setWithMean(true)
-// Compute summary statistics by fitting the StandardScaler.
-val scalerModel_train = CompetitionDistanceScaler.fit(store_train_data_sql)
-val scalerModel_test = CompetitionDistanceScaler.fit(store_test_data_sql)
-
-val store_train_data_sql_01= scalerModel_train.transform(store_train_data_sql)
-val store_test_data_sql_01= scalerModel_train.transform(store_test_data_sql)
-
-store_train_data_sql_01.show(10)
-
-
-/*
 // ================================================ train of main step ======================================================
 // The linear Regression Pipeline ----------------------------------------
 val linearTvs = preppedLRPipeline()
-
-
 val lrModel = fitModel(linearTvs, store_train_data_sql)
 println("finish building pipeline !")
 println("finish training fitting !")
-
 println("begin Generating kaggle predictions")
 val lrOut = lrModel.transform(store_train_data_sql) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","predict_Sales") //rename the column
-
 lrOut.rdd.foreach(row => println(row))
 println("Saving kaggle predictions")
 //savePredictions(lrOut, test_data_sql)
 lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
 println("saving is done !")
-*/
+
 
 }
 }
@@ -506,20 +477,20 @@ DayOfWeek:Double,
 Date:String,
 Sales:Double,
 Customers:Int,
-Open:Int,
+Open:Double,
 Promo:Int,
 //StateHoliday:String,
 SchoolHoliday:String
-)
+)   
 
 case class store_info(
 Store:Int,
 StoreType:String,	
 Assortment:String,
-CompetitionDistance: Int,
-CompetitionOpenSinceMonth:Int,	
-CompetitionOpenSinceYear:Int,
-Promo2:Int,
-Promo2SinceWeek:Int,
-Promo2SinceYear:Int
+CompetitionDistance: Double,
+CompetitionOpenSinceMonth:Double,	
+CompetitionOpenSinceYear:Double,
+Promo2:Double,
+Promo2SinceWeek:Double,
+Promo2SinceYear:Double
 )
