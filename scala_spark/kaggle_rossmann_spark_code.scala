@@ -406,7 +406,6 @@ val store_data_sql = sqlContext.sql("""
 println("show some of the store data")
 store_data_sql.show(3)
 
-
 //========================================= try to combine train data and store data together =============================
 
 val store_train_data_sql = sqlContext.sql("""
@@ -425,7 +424,7 @@ val store_train_data_sql = sqlContext.sql("""
 			t.DayOfWeek,
 			t.SchoolHoliday
         FROM table_train t inner join store_table s on s.Store =t.Store
-        Limit 10000
+        Limit 100000
           """).na.drop()
 println("show some of the train_store data")
 store_train_data_sql.show(5)
@@ -451,8 +450,26 @@ val store_test_data_sql = sqlContext.sql("""
        
           """).na.drop()
 println("show some of the test_store data")
-store_test_data_sql.show(5)
 
+// ===================================== do some data exploration ==============================================
+println("do some data exploration:")
+store_train_data_sql.describe("CompetitionDistance","CompetitionOpenSinceMonth","Promo2SinceWeek","label").show()
+store_test_data_sql.describe("CompetitionDistance","CompetitionOpenSinceMonth","Promo2SinceWeek","label").show()
+
+
+// ======================================= do some dealing to data before pipeline =========================================
+// add some other column-------------------------
+store_train_data_sql.withColumn("CompetitionDistance*Promo2",store_train_data_sql("CompetitionDistance")*store_train_data_sql("Promo2"))
+store_test_data_sql.withColumn("CompetitionDistance*Promo2",store_test_data_sql("CompetitionDistance")*store_test_data_sql("Promo2"))
+
+store_train_data_sql.withColumn("CompetitionTime", 2018-store_train_data_sql("CompetitionOpenSinceYear"))
+store_test_data_sql.withColumn("CompetitionTime", 2018-store_test_data_sql("CompetitionOpenSinceYear"))
+
+println("show the store_train_data_sql schema:")
+store_train_data_sql.printSchema()
+
+println("show the store_test_data_sql schema:")
+store_test_data_sql.printSchema()
 
 
 // ================================================ train of main step ======================================================
