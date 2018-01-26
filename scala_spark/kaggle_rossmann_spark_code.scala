@@ -18,7 +18,7 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.mllib.linalg.Vectors
 
-import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer}
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer, Binarizer, Bucketizer}
 // ML Feature Creation
 
 import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
@@ -64,11 +64,36 @@ show some of the test_store data
 |  896|        a|         c|                170|                        9|                    2012|              0|           2010|     0| 7813.0|   1|      1.0|            0|
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+*/
 
+//=================================================================================================================================================================================
+
+/*show some data of store_train_data_sql_04:
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
+|Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|CompetitionDistance*Promo2|CompetitionTime|CompetitionDistance_Binarized|CompetitionDistance_Bucketized|CompetitionDistance*Promo2_Bucketized|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
+|   31|        d|         c|             9800.0|                      7.0|                  2012.0|            0.0|         2010.0|   0.0| 7248.0| 1.0|      5.0|            1|                       0.0|            6.0|                          1.0|                           4.0|                                  1.0|
+|  231|        d|         c|             3840.0|                     10.0|                  2008.0|           39.0|         2010.0|   1.0| 8353.0| 1.0|      5.0|            0|                    3840.0|           10.0|                          0.0|                           2.0|                                  2.0|
+|  431|        d|         c|             4520.0|                      0.0|                  2010.0|            0.0|         2010.0|   0.0|12369.0| 1.0|      5.0|            1|                       0.0|            8.0|                          0.0|                           2.0|                                  1.0|
+|  631|        d|         c|             2870.0|                      0.0|                  2010.0|           35.0|         2012.0|   1.0| 7428.0| 1.0|      5.0|            1|                    2870.0|            8.0|                          0.0|                           1.0|                                  1.0|
+|  831|        a|         a|              800.0|                      6.0|                  2007.0|            0.0|         2010.0|   0.0|15152.0| 1.0|      5.0|            1|                       0.0|           11.0|                          0.0|                           1.0|                                  1.0|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
+
+show some data of store_test_data_sql_04:
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
+|Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|CompetitionDistance*Promo2|CompetitionTime|CompetitionDistance_Binarized|CompetitionDistance_Bucketized|CompetitionDistance*Promo2_Bucketized|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
+|  891|        a|         c|              350.0|                      0.0|                  2010.0|           31.0|         2013.0|   1.0|10821.0| 1.0|      1.0|            0|                     350.0|            8.0|                          0.0|                           1.0|                                  1.0|
+|  892|        a|         a|            19370.0|                      4.0|                  2002.0|            0.0|         2010.0|   0.0|13186.0| 1.0|      1.0|            0|                       0.0|           16.0|                          1.0|                           7.0|                                  1.0|
+|  893|        a|         a|              130.0|                      0.0|                  2010.0|            1.0|         2013.0|   1.0| 8121.0| 1.0|      1.0|            0|                     130.0|            8.0|                          0.0|                           1.0|                                  1.0|
+|  894|        a|         a|              190.0|                     11.0|                  2012.0|            0.0|         2010.0|   0.0|13713.0| 1.0|      1.0|            0|                       0.0|            6.0|                          0.0|                           1.0|                                  1.0|
+|  895|        a|         c|             4150.0|                      0.0|                  2010.0|            0.0|         2010.0|   0.0|11425.0| 1.0|      1.0|            0|                       0.0|            8.0|                          0.0|                           2.0|                                  1.0|
++-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+*/
+
+
 
 
 object pipeline {
 
-//=========================  StoreType dealing  =====================================
+//=========================  StoreType dealing  
 // StoreType : string => Index
 val StoreTypeIndexer = new StringIndexer()
 	.setInputCol("StoreType")
@@ -79,7 +104,7 @@ val StoreTypeIndexEncoder = new OneHotEncoder()
   .setInputCol("StoreTypeIndex")
   .setOutputCol("StoreTypeVec")
 
-// =========================  Assortment dealing  =====================================
+//=========================  Assortment dealing
 val AssortmentIndexer = new StringIndexer()
 	.setInputCol("Assortment")
 	.setOutputCol("AssortmentIndex")
@@ -89,7 +114,7 @@ val AssortmentIndexEncoder = new OneHotEncoder()
   .setInputCol("AssortmentIndex")
   .setOutputCol("AssortmentVec")
 
-//================================ CompetitionDistance dealing =========================
+//=========================  CompetitionDistance dealing 
 // StandardScaler for CompetitionDistance
 val CompetitionDistanceScaler = new StandardScaler()
   .setInputCol("CompetitionDistance")
@@ -101,37 +126,38 @@ val CompetitionDistanceNormalizer = new Normalizer()
   .setInputCol("CompetitionDistance")
   .setOutputCol("CompetitionDistancescaled")
 
-// ================================ CompetitionOpenSinceMonth dealing ===============
+
+//=========================  CompetitionOpenSinceMonth dealing
 //one-hot for CompetitionOpenSinceMonth
 val CompetitionOpenSinceMonthEncoder = new OneHotEncoder()
   .setInputCol("CompetitionOpenSinceMonth")
   .setOutputCol("CompetitionOpenSinceMonthVec")
 
-// ============================ CompetitionOpenSinceYear dealing ===============
-//one-hot for CompetitionOpenSinceYear
+//=========================  CompetitionOpenSinceYear dealing 
+// one-hot for it
 val CompetitionOpenSinceYearEncoder = new OneHotEncoder()
   .setInputCol("CompetitionOpenSinceYear")
   .setOutputCol("CompetitionOpenSinceYearVec")	
 
-//============================ Promo2SinceWeek dealing ===================
+//=========================  Promo2SinceWeek dealing
 // USE ORIGINAL DATA
 
-// ========================== Promo2SinceYear dealing ==============
+//=========================  Promo2SinceYear dealing 
 //one-hot for Promo2SinceYear
 val Promo2SinceYearEncoder = new OneHotEncoder()
   .setInputCol("Promo2SinceYear")
   .setOutputCol("Promo2SinceYearVec")	
 
-// ============================ Promo2 dealing =========================
+//=========================  Promo2 dealing 
 // USE ORIGINAL DATA
 
-// =============== Open dealing ================
+//=========================  Open dealing
 // open : one-hot
 val OpenEncoder = new OneHotEncoder()
   .setInputCol("Open")
   .setOutputCol("OpenVec")
 
-//============================ schoolHoliday dealing ======================
+//=========================  schoolHoliday dealing 
 // schoolHoliday : string => Index 
 val SchoolHolidayIndexer = new StringIndexer()
   .setInputCol("SchoolHoliday")
@@ -143,28 +169,52 @@ val SchoolHolidayEncoder = new OneHotEncoder()
   .setOutputCol("SchoolHolidayVec")
 
 
-// ================================ DayOfWeek dealing ======================
+//=========================  DayOfWeek dealing 
 // DayOfWeek: one-hot
 val DayOfWeekEncoder = new OneHotEncoder()
   .setInputCol("DayOfWeek")
   .setOutputCol("DayOfWeekVec")
 
-// ===============================store dealing =========================
+//=========================  store dealing 
 // seems it is usefulless
 
+//=========================  CompetitionTime dealing 
+// one-hot for it 
+val CompetitionTimeEncoder = new OneHotEncoder()
+  .setInputCol("CompetitionTime")
+  .setOutputCol("CompetitionTimeVec")
 
-//=============================== assemble all the features =========================================
+//=========================  CompetitionDistance_Bucketized dealing
+// one-hot for it
+val CompetitionDistance_BucketizedEncoder = new OneHotEncoder()
+  .setInputCol("CompetitionDistance_Bucketized")
+  .setOutputCol("CompetitionDistance_BucketizedVec")
+
+//=========================  CompetitionDistance*Promo2_Bucketized 
+// one-hot for it
+val CompetitionDistance_Promo2_BucketizedEncoder = new OneHotEncoder()
+  .setInputCol("CompetitionDistance*Promo2_Bucketized")
+  .setOutputCol("CompetitionDistance*Promo2_BucketizedVec")
+
+
+
+//=========================  assemble all the features =========================================
 val Assembler = new VectorAssembler()
   .setInputCols(Array(
   						"StoreTypeVec",
 						"AssortmentVec",
-						"CompetitionDistancescaled",
+						//"CompetitionDistancescaled",
 						"CompetitionOpenSinceMonthVec",
 						"CompetitionOpenSinceYearVec",
 						"Promo2SinceYearVec",
+						"Promo2",
 						"OpenVec",
 						"SchoolHolidayVec",
-						"DayOfWeekVec"
+						"DayOfWeekVec",
+						"CompetitionTimeVec",
+						"CompetitionDistance_BucketizedVec",
+						"CompetitionDistance*Promo2_BucketizedVec",
+						"CompetitionDistance_Binarized"
             		)
         )
   .setOutputCol("features")
@@ -207,7 +257,7 @@ def preppedLRPipeline():CrossValidator = {
 					StoreTypeIndexEncoder,
 					AssortmentIndexer,
 					AssortmentIndexEncoder,
-					CompetitionDistanceNormalizer,
+					//CompetitionDistanceNormalizer,
 					//CompetitionDistanceScaler,
 					CompetitionOpenSinceMonthEncoder,
 					CompetitionOpenSinceYearEncoder,
@@ -216,6 +266,9 @@ def preppedLRPipeline():CrossValidator = {
 					SchoolHolidayIndexer,
 					SchoolHolidayEncoder,
 					DayOfWeekEncoder,
+					CompetitionTimeEncoder,
+					CompetitionDistance_BucketizedEncoder,
+					CompetitionDistance_Promo2_BucketizedEncoder,
               		Assembler, 
               		lr  // the last thing is the model
                     )
@@ -299,7 +352,7 @@ def main(args: Array[String]): Unit = {
   
   
 //val conf = new SparkConf().setAppName("pipeline_regression")
-val sc = new SparkContext(new SparkConf().setAppName("App").setMaster("local[4]"))
+val sc = new SparkContext(new SparkConf().setAppName("App").setMaster("local[8]"))
 val sqlContext = new SQLContext(sc)
 
 //====================================   reading data =========================================
@@ -436,7 +489,7 @@ val store_test_data_sql = sqlContext.sql("""
 			s.Store,
 			s.StoreType,
 			s.Assortment,
-			if(s.CompetitionDistance = 999999.0, 0.0 , s.CompetitionDistance) CompetitionDistance,
+			if(s.CompetitionDistance = 999999.0, 0.0, s.CompetitionDistance) CompetitionDistance,
 			if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
 			if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
 			if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
@@ -455,33 +508,136 @@ println("show some of the test_store data")
 println("do some data exploration:")
 store_train_data_sql.describe("CompetitionDistance","CompetitionOpenSinceMonth","Promo2SinceWeek","label").show()
 store_test_data_sql.describe("CompetitionDistance","CompetitionOpenSinceMonth","Promo2SinceWeek","label").show()
+/*
+do some data exploration:
++-------+-------------------+-------------------------+-----------------+------------------+
+|summary|CompetitionDistance|CompetitionOpenSinceMonth|  Promo2SinceWeek|             label|
++-------+-------------------+-------------------------+-----------------+------------------+
+|  count|             100000|                   100000|           100000|            100000|
+|   mean|          4978.7178|                  4.99416|         13.83461|        5681.19931|
+| stddev|  7002.943309063922|        4.310244296371147|17.56382749140688|3816.8442560373783|
+|    min|                 60|                      0.0|              0.0|               0.0|
+|    max|              30030|                     12.0|             50.0|           35154.0|
++-------+-------------------+-------------------------+-----------------+------------------+
 
++-------+-------------------+-------------------------+-----------------+-----------------+
+|summary|CompetitionDistance|CompetitionOpenSinceMonth|  Promo2SinceWeek|            label|
++-------+-------------------+-------------------------+-----------------+-----------------+
+|  count|                 45|                       45|               45|               45|
+|   mean|  4583.777777777777|                      3.6|9.955555555555556|           9742.8|
+| stddev|   6081.30186679314|        3.523886743040669|15.41565662356951|3247.693086210924|
+|    min|                 70|                      0.0|              0.0|           3033.0|
+|    max|              22350|                     11.0|             45.0|          16862.0|
++-------+-------------------+-------------------------+-----------------+-----------------+
+*/
 
 // ======================================= do some dealing to data before pipeline =========================================
 // add some other column-------------------------
-store_train_data_sql.withColumn("CompetitionDistance*Promo2",store_train_data_sql("CompetitionDistance")*store_train_data_sql("Promo2"))
-store_test_data_sql.withColumn("CompetitionDistance*Promo2",store_test_data_sql("CompetitionDistance")*store_test_data_sql("Promo2"))
+val store_train_data_sql_01 = store_train_data_sql.withColumn("CompetitionDistance*Promo2",store_train_data_sql("CompetitionDistance")*store_train_data_sql("Promo2"))
+val store_test_data_sql_01 = store_test_data_sql.withColumn("CompetitionDistance*Promo2",store_test_data_sql("CompetitionDistance")*store_test_data_sql("Promo2"))
 
-store_train_data_sql.withColumn("CompetitionTime", 2018-store_train_data_sql("CompetitionOpenSinceYear"))
-store_test_data_sql.withColumn("CompetitionTime", 2018-store_test_data_sql("CompetitionOpenSinceYear"))
+val store_train_data_sql_02 = store_train_data_sql_01.withColumn("CompetitionTime", store_train_data_sql("CompetitionOpenSinceYear")*(-1)+2018)
+val store_test_data_sql_02 = store_test_data_sql_01.withColumn("CompetitionTime", store_test_data_sql("CompetitionOpenSinceYear")*(-1)+2018)
 
 println("show the store_train_data_sql schema:")
-store_train_data_sql.printSchema()
-
+store_train_data_sql_02.printSchema()
 println("show the store_test_data_sql schema:")
-store_test_data_sql.printSchema()
+store_test_data_sql_02.printSchema()
+
+println("show some data of store_train_data_sql_02:")
+store_train_data_sql_02.show(5)
+println("show some data of store_test_data_sql_02:")
+store_test_data_sql_02.show(5)
+
+
+// do some binarizer for features(CompetitionDistance, CompetitionOpenSinceMonth) as new columns to add as the final feature -------------------------
+val Binarizer_CompetitionDistance = new Binarizer()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistance_Binarized")
+  .setThreshold(5000)
+
+val store_train_data_sql_03 = Binarizer_CompetitionDistance.transform(store_train_data_sql_02)
+val store_test_data_sql_03 = Binarizer_CompetitionDistance.transform(store_test_data_sql_02)
+
+println("show the store_train_data_sql schema:")
+store_train_data_sql_03.printSchema()
+println("show the store_test_data_sql schema:")
+store_test_data_sql_03.printSchema()
+
+println("show some data of store_train_data_sql_03:")
+store_train_data_sql_03.show(5)
+println("show some data of store_test_data_sql_03:")
+store_test_data_sql_03.show(5)
+
+
+// do some buckets for features(CompetitionDistance, CompetitionDistance*Promo2) as new columns to add as the final feature -------------------------
+val splits_CompetitionDistance = Array(Double.NegativeInfinity,
+					0.0,
+					3000.0,
+					6000.0,
+					9000.0,
+					12000.0,
+					15000.0,
+					18000.0,
+					21000.0,
+					24000.0,
+					27000.0,
+					30000.0,
+					Double.PositiveInfinity)
+
+val splits_CompetitionDistance_Promo2 = Array(Double.NegativeInfinity,
+					0.0,
+					3000.0,
+					6000.0,
+					9000.0,
+					12000.0,
+					15000.0,
+					18000.0,
+					21000.0,
+					24000.0,
+					27000.0,
+					30000.0,
+					Double.PositiveInfinity)
+
+val bucketizer_CompetitionDistance = new Bucketizer()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistance_Bucketized")
+  .setSplits(splits_CompetitionDistance)
+
+val bucketizer_CompetitionDistance_Promo2 = new Bucketizer()
+  .setInputCol("CompetitionDistance*Promo2")
+  .setOutputCol("CompetitionDistance*Promo2_Bucketized")
+  .setSplits(splits_CompetitionDistance_Promo2)
+
+val store_train_data_sql_04 = bucketizer_CompetitionDistance_Promo2.transform(bucketizer_CompetitionDistance.transform(store_train_data_sql_03))
+val store_test_data_sql_04 = bucketizer_CompetitionDistance_Promo2.transform(bucketizer_CompetitionDistance.transform(store_test_data_sql_03))
+
+println("show the store_train_data_sql schema:")
+store_train_data_sql_04.printSchema()
+println("show the store_test_data_sql schema:")
+store_test_data_sql_04.printSchema()
+
+println("show some data of store_train_data_sql_04:")
+store_train_data_sql_04.show(5)
+println("show some data of store_test_data_sql_04:")
+store_test_data_sql_04.show(5)
+
+
 
 
 // ================================================ train of main step ======================================================
 // The linear Regression Pipeline ----------------------------------------
 val linearTvs = preppedLRPipeline()
-val lrModel = fitModel(linearTvs, store_train_data_sql)
+val lrModel = fitModel(linearTvs, store_train_data_sql_04)
 println("finish building pipeline !")
 println("finish training fitting !")
 println("begin Generating kaggle predictions")
-val lrOut = lrModel.transform(store_train_data_sql) // transform is predicting in the sklearn
+
+val lrOut = lrModel.transform(store_train_data_sql_04) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","predict_Sales") //rename the column
+
 lrOut.select("label","predict_Sales").rdd.foreach(row => println(row))
+
 println("Saving kaggle predictions")
 //savePredictions(lrOut, test_data_sql)
 lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
@@ -509,7 +665,7 @@ case class store_info(
 Store:Int,
 StoreType:String,	
 Assortment:String,
-CompetitionDistance: Int,
+CompetitionDistance: Double,
 CompetitionOpenSinceMonth:Double,	
 CompetitionOpenSinceYear:Double,
 Promo2:Double,
