@@ -633,7 +633,7 @@ println("finish building pipeline !")
 println("finish training fitting !")
 println("begin Generating kaggle predictions")
 
-val lrOut = lrModel.transform(store_train_data_sql_04) // transform is predicting in the sklearn
+val lrOut = lrModel.transform(store_test_data_sql_04) // transform is predicting in the sklearn
   .withColumnRenamed("prediction","predict_Sales") //rename the column
 
 lrOut.select("label","predict_Sales").rdd.foreach(row => println(row))
