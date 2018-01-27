@@ -1,5 +1,5 @@
 // this is a simple: using spark mllib pipeline to solve a regression problem
-//
+// coder:wuyifan
 
 import org.apache.log4j.{Logger}
 //core and SparkSQL
@@ -18,7 +18,7 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.mllib.linalg.Vectors
 
-import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer, Binarizer, Bucketizer}
+import org.apache.spark.ml.feature.{PCA, StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer, Binarizer, Bucketizer}
 // ML Feature Creation
 
 import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
@@ -90,7 +90,52 @@ show some data of store_test_data_sql_04:
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+*/
 
 
+/* 
+methods to transform features should be noticed in some aspects as below:
+1. such as StringIndexer, when it is fitted in a column of train data, and when it is used in a column of test data
+   if a string which is not seen by the StringIndexer before , a problem would occur , shown as below:
+==== fit in train data ===
+ id | category | categoryIndex  
+----|----------|---------------  
+ 0  | a        | 0.0  
+ 1  | b        | 2.0  
+ 2  | c        | 1.0  
+ 3  | a        | 0.0  
+ 4  | a        | 0.0  
+ 5  | c        | 1.0  
 
+==== use in test data ===
+ id | category | categoryIndex  
+----|----------|---------------  
+ 0  | a        | 0.0  
+ 1  | b        | 2.0  
+ 2  | d        | ？  
+ 3  | e        | ？  
+ 4  | a        | 0.0  
+ 5  | c        | 1.0 
+
+Spark give two way to solve the problem：
+for example:  
+val labelIndexerModel=new StringIndexer().  
+                setInputCol("label")  
+                .setOutputCol("indexedLabel")  
+                .setHandleInvalid("error")  //or .setHandleInvalid("skip") 
+                .fit(rawData); 
+
+ （1）.setHandleInvalid("error")：print error  
+ org.apache.spark.SparkException: Unseen label: d，e  
+ （2）.setHandleInvalid("skip") ignore the data contain the d,e
+
+2.such as one-hot encoder, so one-hot result dimension of train data and test data may be different
+  because of some value of the feature (which is taken to one-hot) in train data does not exists in test data
+  so the dimension of test data feature would be less than train data 
+
+3.some encoder need to be fitted ,some do not !
+need to be fitted: VectorIndexer, StringIndexer, QuantileDiscretizer ...
+not to be fitted: Bucketizer, oneHotEncoder ...
+
+
+*/
 
 object pipeline {
 
@@ -164,7 +209,7 @@ val SchoolHolidayIndexer = new StringIndexer()
   .setInputCol("SchoolHoliday")
   .setOutputCol("SchoolHolidayIndex")
 
-// SchoolHolidayIndex : one-hot
+//=========================  SchoolHolidayIndex : one-hot
 val SchoolHolidayEncoder = new OneHotEncoder()
   .setInputCol("SchoolHolidayIndex")
   .setOutputCol("SchoolHolidayVec")
@@ -219,6 +264,12 @@ val Assembler = new VectorAssembler()
             		)
         )
   .setOutputCol("features")
+
+//=========================  PCA all the features ==============================================
+val PcaEncoder = new PCA()
+  .setInputCol("features")
+  .setOutputCol("pcaFeatures")
+  .setK(10)
 
 
 
@@ -294,7 +345,7 @@ def preppedLRPipeline():CrossValidator = {
 					AssortmentIndexer,
 					AssortmentIndexEncoder,
 					//CompetitionDistanceNormalizer,
-					//CompetitionDistanceScaler,
+					//CompetitionDistanceScaler, // some methods including Normalizer and PCA need its input something like vector column??
 					CompetitionOpenSinceMonthEncoder,
 					CompetitionOpenSinceYearEncoder,
 					Promo2SinceYearEncoder,
@@ -306,6 +357,7 @@ def preppedLRPipeline():CrossValidator = {
 					CompetitionDistance_BucketizedEncoder,
 					CompetitionDistance_Promo2_BucketizedEncoder,
               		Assembler, 
+              		PcaEncoder,
               		m  // the last thing is the model
                     )
             )
@@ -670,6 +722,7 @@ println("finish training fitting !")
 println("begin Generating kaggle predictions")
 
 val lrOut = lrModel.transform(store_test_data_sql_04) // transform is predicting in the sklearn
+// there is a error maybe the dimension of train data input and test data input are different !!!!
   .withColumnRenamed("prediction","predict_Sales") //rename the column
 
 lrOut.select("label","predict_Sales").rdd.foreach(row => println(row))
