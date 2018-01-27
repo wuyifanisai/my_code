@@ -1,5 +1,5 @@
 // this is a simple: using spark mllib pipeline to solve a regression problem
-// coder:wuyifan
+// coder:wuyifan didi
 
 import org.apache.log4j.{Logger}
 //core and SparkSQL
