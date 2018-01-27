@@ -29,8 +29,9 @@ import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
 import org.apache.spark.ml.evaluation.{RegressionEvaluator}
 // evaluation for regression model
 
-import org.apache.spark.ml.regression.{LinearRegression}
+import org.apache.spark.ml.regression.{LinearRegression, DecisionTreeRegressor, RandomForestRegressor, GBTRegressor}
 // regression model
+// we will use some different models and compare them with each other ,finally a best model with best parameters would be appeared ! 
 
 import org.apache.spark.ml.Pipeline
 // pipeline
@@ -243,13 +244,48 @@ Super simple! Let's walk through the creation for each model.
 // this is a pipeline which can cerate new features and train the model and tune the parameters
 // finally , this pipeline would give us a model with best parameters 
 def preppedLRPipeline():CrossValidator = {
-  val lr = new LinearRegression()
 
+  println("========== add ml model to pipeline ===============")
+  println()
+  println("which model do you want to use? ")
+  println("0 ---> LinearRegression")
+  println("1 ---> DecisionTreeRegressor")
+  println("2 ---> RandomForestRegressor")
+  println("3---> GBTRegressor")
+
+  if (readLine() == "0") {
+  val m = new LinearRegression()
   val paramGrid = new ParamGridBuilder()  // parameters to tune
-    .addGrid(lr.regParam, Array(0.1, 0.01))
-    //.addGrid(lr.fitIntercept)
-    .addGrid(lr.elasticNetParam, Array(0.0, 0.25, 0.5, 0.75, 1.0))
+    .addGrid(m.regParam, Array(0.1, 0.01))
+    .addGrid(m.elasticNetParam, Array(0.0, 0.25, 0.5, 0.75, 1.0))
     .build()
+  }
+  else if(readLine() == "1") {
+  val m = new DecisionTreeRegressor()
+  val paramGrid = new ParamGridBuilder()  // parameters to tune
+    .addGrid(m.impurity, Array("variance"))
+    .addGrid(m.maxDepth, Array(3,5,10,20))
+    .addGrid(m.maxBins, Array(8,16,32,64))
+    .build()
+  }
+  else if(readLine() == "2") {
+  val m = new RandomForestRegressor()
+  val paramGrid = new ParamGridBuilder()  // parameters to tune
+    .addGrid(m.numTrees, Array(10,30,50,100))
+    .addGrid(m.maxDepth, Array(3,5,10,20))
+    .addGrid(m.maxBins, Array(8,16,32,64))
+    .addGrid(m.impurity, Array("variance"))
+    .build()
+  }
+  else{
+  val m = new GBTRegressor()
+  val paramGrid= new ParamGridBuilder()  // parameters to tune
+    .addGrid(m.numIterations, Array(10,30,50,100))
+    .addGrid(m.maxDepth, Array(3,5,10,20))
+    .build()
+  }
+
+
 
   val pipeline = new Pipeline()
     .setStages(Array(                   // put all the preprocessing before and model into the pipeline
@@ -270,7 +306,7 @@ def preppedLRPipeline():CrossValidator = {
 					CompetitionDistance_BucketizedEncoder,
 					CompetitionDistance_Promo2_BucketizedEncoder,
               		Assembler, 
-              		lr  // the last thing is the model
+              		m  // the last thing is the model
                     )
             )
 
