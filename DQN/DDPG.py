@@ -31,7 +31,7 @@ MEMORY_SIZE = 10000
 BATCH_SIZE = 32
 RENDER = False
 ENV_NAME = 'Pendulum-v0'
-LOAD = True 
+LOAD = True
 # False ==> train and save para  True==>restore the para and play
 
 ################## define class of DDPG ##################
