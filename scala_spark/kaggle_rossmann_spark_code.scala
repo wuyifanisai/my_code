@@ -134,8 +134,8 @@ object pipeline {
 //=========================  StoreType dealing  
 // StoreType : string => Index
 val StoreTypeIndexer = new StringIndexer()
-	.setInputCol("StoreType")
-	.setOutputCol("StoreTypeIndex")
+  .setInputCol("StoreType")
+  .setOutputCol("StoreTypeIndex")
 
 // StoreTypeIndex : one-hot
 val StoreTypeIndexEncoder = new OneHotEncoder()
@@ -144,8 +144,8 @@ val StoreTypeIndexEncoder = new OneHotEncoder()
 
 //=========================  Assortment dealing
 val AssortmentIndexer = new StringIndexer()
-	.setInputCol("Assortment")
-	.setOutputCol("AssortmentIndex")
+  .setInputCol("Assortment")
+  .setOutputCol("AssortmentIndex")
 
 // AssortmentIndex : one-hot
 val AssortmentIndexEncoder = new OneHotEncoder()
@@ -165,20 +165,21 @@ val QuantileDiscretizer_CompetitionDistance = new QuantileDiscretizer()
 // change CompetitionDistance into a Vector column
 val Assembler_CompetitionDistance = new VectorAssembler()
   .setInputCols(Array("CompetitionDistance"))
-  .setOutputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistanceVec")
 
 
 // StandardScaler for CompetitionDistance(choose one of them)
 val CompetitionDistanceScaler = new StandardScaler()
-  .setInputCol("CompetitionDistance")
+  .setInputCol("CompetitionDistanceVec")
   .setOutputCol("CompetitionDistancescaled")
   .setWithStd(true)
   .setWithMean(false)
 
+/*
 val CompetitionDistanceNormalizer = new Normalizer()
   .setInputCol("CompetitionDistance")
   .setOutputCol("CompetitionDistancescaled")
-
+*/
 
 //=========================  CompetitionOpenSinceMonth dealing
 //one-hot for CompetitionOpenSinceMonth
@@ -190,7 +191,7 @@ val CompetitionOpenSinceMonthEncoder = new OneHotEncoder()
 // one-hot for it
 val CompetitionOpenSinceYearEncoder = new OneHotEncoder()
   .setInputCol("CompetitionOpenSinceYear")
-  .setOutputCol("CompetitionOpenSinceYearVec")	
+  .setOutputCol("CompetitionOpenSinceYearVec")  
 
 //=========================  Promo2SinceWeek dealing
 // USE ORIGINAL DATA
@@ -199,7 +200,7 @@ val CompetitionOpenSinceYearEncoder = new OneHotEncoder()
 //one-hot for Promo2SinceYear
 val Promo2SinceYearEncoder = new OneHotEncoder()
   .setInputCol("Promo2SinceYear")
-  .setOutputCol("Promo2SinceYearVec")	
+  .setOutputCol("Promo2SinceYearVec") 
 
 //=========================  Promo2 dealing 
 // USE ORIGINAL DATA
@@ -254,24 +255,21 @@ val CompetitionDistance_Promo2_BucketizedEncoder = new OneHotEncoder()
 //=========================  assemble all the features =========================================
 val Assembler = new VectorAssembler()
   .setInputCols(Array(
-  						"StoreTypeVec",
-						"AssortmentVec",
-
-						//
-						//"CompetitionDistancescaled",
-
-						"CompetitionOpenSinceMonthVec",
-						"CompetitionOpenSinceYearVec",
-						"Promo2SinceYearVec",
-						"Promo2",
-						"OpenVec",
-						"SchoolHolidayVec",
-						"DayOfWeekVec",
-						"CompetitionTimeVec",
-						"CompetitionDistance_BucketizedVec",
-						"CompetitionDistance*Promo2_BucketizedVec",
-						"CompetitionDistance_Binarized"
-            		)
+              "StoreTypeVec",
+            "AssortmentVec",
+            "CompetitionDistancescaled",
+            "CompetitionOpenSinceMonthVec",
+            "CompetitionOpenSinceYearVec",
+            "Promo2SinceYearVec",
+            "Promo2",
+            "OpenVec",
+            "SchoolHolidayVec",
+            "DayOfWeekVec",
+            "CompetitionTimeVec",
+            "CompetitionDistance_BucketizedVec",
+            "CompetitionDistance*Promo2_BucketizedVec",
+            "CompetitionDistance_Binarized"
+                )
         )
   .setOutputCol("features")
 
@@ -316,12 +314,14 @@ def preppedLRPipeline():CrossValidator = {
   println("3 ---> GBTRegressor")
 
   //initialize model and paramgrid
-  val m = new GBTRegressor()
-  val paramGrid= new ParamGridBuilder()  // parameters to tune
-    .addGrid(m.maxIter, Array(30))
-    .addGrid(m.maxDepth, Array(5,7))
+  val m = new RandomForestRegressor()
+  val paramGrid = new ParamGridBuilder()  // parameters to tune
+    .addGrid(m.numTrees, Array(50))
+    .addGrid(m.maxDepth, Array(5))
+    .addGrid(m.maxBins, Array(8))
+    .addGrid(m.impurity, Array("variance"))
     .build()
-  println("GBTRegressor is chosen, maxIter and maxDepth will be tuned !")
+  println("RandomForestRegressor is chosen, numTrees and maxDepth and maxBins will be tuned !")
   
 /*
   if (readLine() == "L") {
@@ -366,27 +366,27 @@ def preppedLRPipeline():CrossValidator = {
 
   val pipeline = new Pipeline()
     .setStages(Array(                   // put all the preprocessing before and model into the pipeline
-            		StoreTypeIndexer,
-					StoreTypeIndexEncoder,
-					AssortmentIndexer,
-					AssortmentIndexEncoder,
+                StoreTypeIndexer,
+          StoreTypeIndexEncoder,
+          AssortmentIndexer,
+          AssortmentIndexEncoder,
 
-					//Assembler_CompetitionDistance,
-					//CompetitionDistanceScaler, // some methods including Normalizer and PCA need its input something like vector column??
+          Assembler_CompetitionDistance,
+          CompetitionDistanceScaler, // some methods including Normalizer and PCA need its input something like vector column??
 
-					CompetitionOpenSinceMonthEncoder,
-					CompetitionOpenSinceYearEncoder,
-					Promo2SinceYearEncoder,
-					OpenEncoder,
-					SchoolHolidayIndexer,
-					SchoolHolidayEncoder,
-					DayOfWeekEncoder,
-					CompetitionTimeEncoder,
-					CompetitionDistance_BucketizedEncoder,
-					CompetitionDistance_Promo2_BucketizedEncoder,
-              		Assembler, 
-              		//PcaEncoder,
-              		m  // the last thing is the model
+          CompetitionOpenSinceMonthEncoder,
+          CompetitionOpenSinceYearEncoder,
+          Promo2SinceYearEncoder,
+          OpenEncoder,
+          SchoolHolidayIndexer,
+          SchoolHolidayEncoder,
+          DayOfWeekEncoder,
+          CompetitionTimeEncoder,
+          CompetitionDistance_BucketizedEncoder,
+          CompetitionDistance_Promo2_BucketizedEncoder,
+                  Assembler, 
+                  //PcaEncoder,
+                  m  // the last thing is the model
                     )
             )
 
@@ -477,16 +477,16 @@ val sqlContext = new SQLContext(sc)
 val dt1 = sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/train.csv", 1)
 val trainRaw = dt1.map(line => line.split(","))
 val train = trainRaw.map(x => R_train(
-										x(0).toInt,
-										x(1).toInt,
-										x(2).toString,
-										x(3).toDouble,
-										x(4).toInt,
-										x(5).toInt,
-										x(6).toInt,
-										//x(7).toString,
-										x(8).toString
-										)
+                    x(0).toInt,
+                    x(1).toInt,
+                    x(2).toString,
+                    x(3).toDouble,
+                    x(4).toInt,
+                    x(5).toInt,
+                    x(6).toInt,
+                    //x(7).toString,
+                    x(8).toString
+                    )
 )
 //val trainRaw = dt1.map(s => Vectors.dense(s.split(',').map(_.toDouble)))
 
@@ -495,16 +495,16 @@ val train = trainRaw.map(x => R_train(
 val dt2= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/test.csv", 1)
 val testRaw = dt2.map(line => line.split(","))
 val test = testRaw.map(x => R_train(
-										x(0).toInt,
-										x(1).toInt,
-										x(2).toString,
-										x(3).toDouble,
-										x(4).toInt,
-										x(5).toInt,
-										x(6).toInt,
-										//x(7).toString,
-										x(8).toString
-										)
+                    x(0).toInt,
+                    x(1).toInt,
+                    x(2).toString,
+                    x(3).toDouble,
+                    x(4).toInt,
+                    x(5).toInt,
+                    x(6).toInt,
+                    //x(7).toString,
+                    x(8).toString
+                    )
 )
 
 
@@ -512,15 +512,15 @@ val test = testRaw.map(x => R_train(
 val dt3= sc.textFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/store.csv", 1)
 val storeRaw = dt3.map(line => line.split(","))
 val store = storeRaw.map(x => store_info(
-										x(0).toInt,
-										x(1).toString,
-										x(2).toString,
-										x(3).toInt,
-										x(4).toInt,
-										x(5).toInt,
-										x(6).toInt,
-										x(7).toInt,
-										x(8).toInt						
+                    x(0).toInt,
+                    x(1).toString,
+                    x(2).toString,
+                    x(3).toInt,
+                    x(4).toInt,
+                    x(5).toInt,
+                    x(6).toInt,
+                    x(7).toInt,
+                    x(8).toInt            
 ))
 
 // transfrom RDD into dataFrame-----------------------------------------------------------------
@@ -542,7 +542,7 @@ println("store data has been registered into TempTable ==> <table_store> ")
 // using sql to get the data we want from table--------------------------------------------------
 
 val train_data_sql = sqlContext.sql("""
-			SELECT 
+      SELECT 
                 Store,
                 Sales label, 
                 Open Open, 
@@ -556,7 +556,7 @@ train_data_sql.show(3)
 
 
 val test_data_sql = sqlContext.sql("""
-			SELECT 
+      SELECT 
                 Store,
                 Sales actual_sale, 
                 Open Open, 
@@ -569,7 +569,7 @@ test_data_sql.show(3)
 
 
 val store_data_sql = sqlContext.sql("""
-			SELECT *
+      SELECT *
             FROM store_table
           """).na.drop()
 println("show some of the store data")
@@ -578,20 +578,20 @@ store_data_sql.show(3)
 //========================================= try to combine train data and store data together =============================
 
 val store_train_data_sql = sqlContext.sql("""
-		SELECT 
-			s.Store,
-			s.StoreType,
-			s.Assortment,
-			if(s.CompetitionDistance = 999999.0, 0.0 , s.CompetitionDistance) CompetitionDistance,
-			if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
-			if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
-			if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
-			if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
-			s.Promo2,
-			t.Sales label,
-			t.Open,
-			t.DayOfWeek,
-			t.SchoolHoliday
+    SELECT 
+      s.Store,
+      s.StoreType,
+      s.Assortment,
+      if(s.CompetitionDistance = 999999.0, 0.0 , s.CompetitionDistance) CompetitionDistance,
+      if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+      if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+      if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
+      if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
+      s.Promo2,
+      t.Sales label,
+      t.Open,
+      t.DayOfWeek,
+      t.SchoolHoliday
         FROM table_train t inner join store_table s on s.Store =t.Store
         Limit 5000
           """).na.drop()
@@ -601,20 +601,20 @@ store_train_data_sql.show(5)
 //================================================ try to combine test data and store data together ============================
 
 val store_test_data_sql = sqlContext.sql("""
-		SELECT 
-			s.Store,
-			s.StoreType,
-			s.Assortment,
-			if(s.CompetitionDistance = 999999.0, 0.0, s.CompetitionDistance) CompetitionDistance,
-			if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
-			if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
-			if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
-			if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
-			s.Promo2,
-			t.Sales label,
-			t.Open,
-			t.DayOfWeek,
-			t.SchoolHoliday
+    SELECT 
+      s.Store,
+      s.StoreType,
+      s.Assortment,
+      if(s.CompetitionDistance = 999999.0, 0.0, s.CompetitionDistance) CompetitionDistance,
+      if(s.CompetitionOpenSinceMonth = 999999.0, 0.0 , s.CompetitionOpenSinceMonth) CompetitionOpenSinceMonth,
+      if(s.CompetitionOpenSinceYear=999999.0, 2010.0, s.CompetitionOpenSinceYear) CompetitionOpenSinceYear,
+      if(s.Promo2SinceWeek = 999999.0, 0.0, s.Promo2SinceWeek ) Promo2SinceWeek,
+      if(s.Promo2SinceYear = 999999.0, 2010.0, s.Promo2SinceYear) Promo2SinceYear,
+      s.Promo2,
+      t.Sales label,
+      t.Open,
+      t.DayOfWeek,
+      t.SchoolHoliday
         FROM table_test t inner join store_table s on s.Store =t.Store
        
           """).na.drop()
@@ -687,32 +687,32 @@ store_test_data_sql_03.show(5)
 
 // do some buckets for features(CompetitionDistance, CompetitionDistance*Promo2) as new columns to add as the final feature -------------------------
 val splits_CompetitionDistance = Array(Double.NegativeInfinity,
-					0.0,
-					3000.0,
-					6000.0,
-					9000.0,
-					12000.0,
-					15000.0,
-					18000.0,
-					21000.0,
-					24000.0,
-					27000.0,
-					30000.0,
-					Double.PositiveInfinity)
+          0.0,
+          3000.0,
+          6000.0,
+          9000.0,
+          12000.0,
+          15000.0,
+          18000.0,
+          21000.0,
+          24000.0,
+          27000.0,
+          30000.0,
+          Double.PositiveInfinity)
 
 val splits_CompetitionDistance_Promo2 = Array(Double.NegativeInfinity,
-					0.0,
-					3000.0,
-					6000.0,
-					9000.0,
-					12000.0,
-					15000.0,
-					18000.0,
-					21000.0,
-					24000.0,
-					27000.0,
-					30000.0,
-					Double.PositiveInfinity)
+          0.0,
+          3000.0,
+          6000.0,
+          9000.0,
+          12000.0,
+          15000.0,
+          18000.0,
+          21000.0,
+          24000.0,
+          27000.0,
+          30000.0,
+          Double.PositiveInfinity)
 
 val bucketizer_CompetitionDistance = new Bucketizer()
   .setInputCol("CompetitionDistance")
@@ -791,10 +791,10 @@ SchoolHoliday:String
 
 case class store_info(
 Store:Int,
-StoreType:String,	
+StoreType:String, 
 Assortment:String,
 CompetitionDistance: Double,
-CompetitionOpenSinceMonth:Double,	
+CompetitionOpenSinceMonth:Double, 
 CompetitionOpenSinceYear:Double,
 Promo2:Double,
 Promo2SinceWeek:Double,
