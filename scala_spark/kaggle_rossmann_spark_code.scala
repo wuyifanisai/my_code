@@ -18,7 +18,7 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.mllib.linalg.Vectors
 
-import org.apache.spark.ml.feature.{PCA, StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer, Binarizer, Bucketizer}
+import org.apache.spark.ml.feature.{StringIndexer, VectorAssembler, OneHotEncoder, StandardScaler, Normalizer, Binarizer, Bucketizer}
 // ML Feature Creation
 
 import org.apache.spark.ml.tuning.{ParamGridBuilder, CrossValidator}
@@ -77,7 +77,6 @@ show some of the test_store data
 |  631|        d|         c|             2870.0|                      0.0|                  2010.0|           35.0|         2012.0|   1.0| 7428.0| 1.0|      5.0|            1|                    2870.0|            8.0|                          0.0|                           1.0|                                  1.0|
 |  831|        a|         a|              800.0|                      6.0|                  2007.0|            0.0|         2010.0|   0.0|15152.0| 1.0|      5.0|            1|                       0.0|           11.0|                          0.0|                           1.0|                                  1.0|
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
-
 show some data of store_test_data_sql_04:
 +-----+---------+----------+-------------------+-------------------------+------------------------+---------------+---------------+------+-------+----+---------+-------------+--------------------------+---------------+-----------------------------+------------------------------+-------------------------------------+
 |Store|StoreType|Assortment|CompetitionDistance|CompetitionOpenSinceMonth|CompetitionOpenSinceYear|Promo2SinceWeek|Promo2SinceYear|Promo2|  label|Open|DayOfWeek|SchoolHoliday|CompetitionDistance*Promo2|CompetitionTime|CompetitionDistance_Binarized|CompetitionDistance_Bucketized|CompetitionDistance*Promo2_Bucketized|
@@ -103,7 +102,6 @@ methods to transform features should be noticed in some aspects as below:
  3  | a        | 0.0  
  4  | a        | 0.0  
  5  | c        | 1.0  
-
 ==== use in test data ===
  id | category | categoryIndex  
 ----|----------|---------------  
@@ -113,7 +111,6 @@ methods to transform features should be noticed in some aspects as below:
  3  | e        | ？  
  4  | a        | 0.0  
  5  | c        | 1.0 
-
 Spark give two way to solve the problem：
 for example:  
 val labelIndexerModel=new StringIndexer().  
@@ -121,20 +118,15 @@ val labelIndexerModel=new StringIndexer().
                 .setOutputCol("indexedLabel")  
                 .setHandleInvalid("error")  //or .setHandleInvalid("skip") 
                 .fit(rawData); 
-
  （1）.setHandleInvalid("error")：print error  
  org.apache.spark.SparkException: Unseen label: d，e  
  （2）.setHandleInvalid("skip") ignore the data contain the d,e
-
 2.such as one-hot encoder, so one-hot result dimension of train data and test data may be different
   because of some value of the feature (which is taken to one-hot) in train data does not exists in test data
   so the dimension of test data feature would be less than train data 
-
 3.some encoder need to be fitted ,some do not !
 need to be fitted: VectorIndexer, StringIndexer, QuantileDiscretizer ...
 not to be fitted: Bucketizer, oneHotEncoder ...
-
-
 */
 
 object pipeline {
@@ -161,7 +153,22 @@ val AssortmentIndexEncoder = new OneHotEncoder()
   .setOutputCol("AssortmentVec")
 
 //=========================  CompetitionDistance dealing 
-// StandardScaler for CompetitionDistance
+//QuantileDiscretizer for CompetitionDistance
+/*
+val QuantileDiscretizer_CompetitionDistance = new QuantileDiscretizer()
+  .setInputCol("CompetitionDistance")
+  .setOutputCol("CompetitionDistance_QuantileDiscretized")
+  .setNumBuckets(10)//设置分箱数
+  .setRelativeError(0.1)//设置precision-控制相对误差
+*/
+
+// change CompetitionDistance into a Vector column
+val Assembler_CompetitionDistance = new VectorAssembler()
+  .setInputCols(Array("CompetitionDistance"))
+  .setOutputCol("CompetitionDistance")
+
+
+// StandardScaler for CompetitionDistance(choose one of them)
 val CompetitionDistanceScaler = new StandardScaler()
   .setInputCol("CompetitionDistance")
   .setOutputCol("CompetitionDistancescaled")
@@ -249,7 +256,10 @@ val Assembler = new VectorAssembler()
   .setInputCols(Array(
   						"StoreTypeVec",
 						"AssortmentVec",
+
+						//
 						//"CompetitionDistancescaled",
+
 						"CompetitionOpenSinceMonthVec",
 						"CompetitionOpenSinceYearVec",
 						"Promo2SinceYearVec",
@@ -265,12 +275,13 @@ val Assembler = new VectorAssembler()
         )
   .setOutputCol("features")
 
+/*
 //=========================  PCA all the features ==============================================
 val PcaEncoder = new PCA()
   .setInputCol("features")
   .setOutputCol("pcaFeatures")
   .setK(10)
-
+*/
 
 
 //------------------------------------ Creating the Pipelines -------------------------------------
@@ -302,41 +313,56 @@ def preppedLRPipeline():CrossValidator = {
   println("0 ---> LinearRegression")
   println("1 ---> DecisionTreeRegressor")
   println("2 ---> RandomForestRegressor")
-  println("3---> GBTRegressor")
+  println("3 ---> GBTRegressor")
 
-  if (readLine() == "0") {
+  //initialize model and paramgrid
+  val m = new GBTRegressor()
+  val paramGrid= new ParamGridBuilder()  // parameters to tune
+    .addGrid(m.maxIter, Array(30))
+    .addGrid(m.maxDepth, Array(5,7))
+    .build()
+  println("GBTRegressor is chosen, maxIter and maxDepth will be tuned !")
+  
+/*
+  if (readLine() == "L") {
   val m = new LinearRegression()
   val paramGrid = new ParamGridBuilder()  // parameters to tune
     .addGrid(m.regParam, Array(0.1, 0.01))
-    .addGrid(m.elasticNetParam, Array(0.0, 0.25, 0.5, 0.75, 1.0))
+    .addGrid(m.elasticNetParam, Array(0.0, 0.5, 1.0))
     .build()
+  println("LinearRegression is chosen, regParam and elasticNetParam will be tuned !")
   }
-  else if(readLine() == "1") {
+
+  else if(readLine() == "D") {
   val m = new DecisionTreeRegressor()
   val paramGrid = new ParamGridBuilder()  // parameters to tune
     .addGrid(m.impurity, Array("variance"))
-    .addGrid(m.maxDepth, Array(3,5,10,20))
-    .addGrid(m.maxBins, Array(8,16,32,64))
+    .addGrid(m.maxDepth, Array(3,5,10))
+    .addGrid(m.maxBins, Array(8,16,64))
     .build()
+  println("DecisionTreeRegressor is chosen, maxDepth and maxBins will be tuned !")
   }
-  else if(readLine() == "2") {
+
+  else if(readLine() == "R") {
   val m = new RandomForestRegressor()
   val paramGrid = new ParamGridBuilder()  // parameters to tune
-    .addGrid(m.numTrees, Array(10,30,50,100))
-    .addGrid(m.maxDepth, Array(3,5,10,20))
-    .addGrid(m.maxBins, Array(8,16,32,64))
+    .addGrid(m.numTrees, Array(10,30,50))
+    .addGrid(m.maxDepth, Array(3,5))
+    .addGrid(m.maxBins, Array(8,16))
     .addGrid(m.impurity, Array("variance"))
     .build()
+  println("RandomForestRegressor is chosen, numTrees and maxDepth and maxBins will be tuned !")
   }
-  else{
+
+  else if(readLine() == "G"){
   val m = new GBTRegressor()
   val paramGrid= new ParamGridBuilder()  // parameters to tune
-    .addGrid(m.numIterations, Array(10,30,50,100))
-    .addGrid(m.maxDepth, Array(3,5,10,20))
+    .addGrid(m.maxIter, Array(10,30,50))
+    .addGrid(m.maxDepth, Array(3,5))
     .build()
+  println("GBTRegressor is chosen, maxIter and maxDepth will be tuned !")
   }
-
-
+*/
 
   val pipeline = new Pipeline()
     .setStages(Array(                   // put all the preprocessing before and model into the pipeline
@@ -344,8 +370,10 @@ def preppedLRPipeline():CrossValidator = {
 					StoreTypeIndexEncoder,
 					AssortmentIndexer,
 					AssortmentIndexEncoder,
-					//CompetitionDistanceNormalizer,
+
+					//Assembler_CompetitionDistance,
 					//CompetitionDistanceScaler, // some methods including Normalizer and PCA need its input something like vector column??
+
 					CompetitionOpenSinceMonthEncoder,
 					CompetitionOpenSinceYearEncoder,
 					Promo2SinceYearEncoder,
@@ -357,18 +385,18 @@ def preppedLRPipeline():CrossValidator = {
 					CompetitionDistance_BucketizedEncoder,
 					CompetitionDistance_Promo2_BucketizedEncoder,
               		Assembler, 
-              		PcaEncoder,
+              		//PcaEncoder,
               		m  // the last thing is the model
                     )
             )
 
-  val tvs = new CrossValidator()  // put the [preprocessing, model], Evaluator, tuning, paramgrid together
+  val cv = new CrossValidator()  // put the [preprocessing, model], Evaluator, tuning, paramgrid together
     .setEstimator(pipeline) // here is something can be fit
     .setEvaluator(new RegressionEvaluator) //here is a model Evaluator
     .setEstimatorParamMaps(paramGrid) // here is the hyper parameters to tune
     .setNumFolds(4) 
 
-  tvs  // return the model with best parameters
+  cv  // return the model with best parameters
 }
 
 
@@ -396,12 +424,12 @@ hyperparameter space for each model. It takes time to try out all
 the permutations in our parameter grid as well as create a training 
 set for each tree so be patient!
 */
-def fitModel(tvs:CrossValidator, data:DataFrame) = {
+def fitModel(cv:CrossValidator, data:DataFrame) = {
   val Array(training, test) = data.randomSplit(Array(0.8, 0.2), seed = 12345)
   // get the train data and test data
 
-  println("Fitting data")
-  val model = tvs.fit(training) // fit the model using tvs(a pipeline)(including tunning hyperparameters !)
+  println("Fitting model (training and tuning) ...")
+  val model = cv.fit(training) // fit the model using cv(a pipeline)(including tunning hyperparameters !)
 
   println("Now performing test on hold out set")
   val holdout = model.transform(test).select("prediction","label") // result of test
@@ -565,7 +593,7 @@ val store_train_data_sql = sqlContext.sql("""
 			t.DayOfWeek,
 			t.SchoolHoliday
         FROM table_train t inner join store_table s on s.Store =t.Store
-        Limit 100000
+        Limit 5000
           """).na.drop()
 println("show some of the train_store data")
 store_train_data_sql.show(5)
@@ -607,7 +635,6 @@ do some data exploration:
 |    min|                 60|                      0.0|              0.0|               0.0|
 |    max|              30030|                     12.0|             50.0|           35154.0|
 +-------+-------------------+-------------------------+-----------------+------------------+
-
 +-------+-------------------+-------------------------+-----------------+-----------------+
 |summary|CompetitionDistance|CompetitionOpenSinceMonth|  Promo2SinceWeek|            label|
 +-------+-------------------+-------------------------+-----------------+-----------------+
@@ -711,27 +738,39 @@ println("show some data of store_test_data_sql_04:")
 store_test_data_sql_04.show(5)
 
 
-
-
 // ================================================ train of main step ======================================================
 // The linear Regression Pipeline ----------------------------------------
 val linearTvs = preppedLRPipeline()
-val lrModel = fitModel(linearTvs, store_train_data_sql_04)
+val Model = fitModel(linearTvs, store_train_data_sql_04)
 println("finish building pipeline !")
 println("finish training fitting !")
-println("begin Generating kaggle predictions")
+println("show the feature transformed by pipeline:")
+val train_data_out = Model.transform(store_train_data_sql_04)
+train_data_out.rdd.foreach(row => println(row))
 
-val lrOut = lrModel.transform(store_test_data_sql_04) // transform is predicting in the sklearn
+/*
+// save model trained before -------------------------------------------
+Model.save("E://spark_model//")
+println("model is stored !")
+
+// reload the model -------------------------
+val Model_reload = CrossValidator.load("E://spark_model//")
+println("model is reloaded!")
+*/
+
+
+// test --------------------------------------------
+println("begin Generating kaggle predictions")
+val Out = Model.transform(store_test_data_sql_04) // transform is predicting in the sklearn
 // there is a error maybe the dimension of train data input and test data input are different !!!!
   .withColumnRenamed("prediction","predict_Sales") //rename the column
 
-lrOut.select("label","predict_Sales").rdd.foreach(row => println(row))
+Out.select("label","predict_Sales").rdd.foreach(row => println(row))
 
 println("Saving kaggle predictions")
 //savePredictions(lrOut, test_data_sql)
-lrOut.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
+Out.rdd.saveAsTextFile("/home/wuyifanhadoop/workspace/kaggle_rossmann/linear_regression_predictions_03.csv")
 println("saving is done !")
-
 
 }
 }
@@ -761,3 +800,4 @@ Promo2:Double,
 Promo2SinceWeek:Double,
 Promo2SinceYear:Double
 )
+
