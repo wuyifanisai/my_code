@@ -41,6 +41,32 @@ echo ''
 
 echo '************* pipeline ***********'
 
+#!/bin/bash
+echo 'this script is s.sh'
+list="a b c d" 
+for alpha in $list;do      
+echo $alpha 
+done
+
+cd shell 
+pwd 
+ls
+mkdir shell_tut
+cd shell_tut
+
+for i in $list;
+do
+touch test_$i.txt
+done
+
+for Variable in {1..3};
+do     
+echo "$Variable" 
+done
+
+
+
+
 
 
 
