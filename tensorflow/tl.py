@@ -80,6 +80,68 @@ class VGG16(object):
 	self.x = tf.placeholder(tf.float32,[None,224, 224, 3])
 	self.y = tf.placeholder(tf.float32,[None,1])
 
+	## covert the RGB to BGR
+	red, green, blue = tf.split(axis = 3, num_or_size_split = 3, value = self.x * 255.0)
+	bgr = tf.concat(axis =3,values=[blue - self.vgg_mean[0], green - self.vgg_meanp[1], blue - self.vgg_mean[2],])
+
+	# prepare vgg16 conv layer to get the parameters from trained model
+	conv11_out = self.conv_layer(bgr,'conv_11')
+	conv12_out = self.conv_layer(conv11_out,'conv_12')
+	pool1_out = self.max_pool(conv_12, 'pool1')
+
+	conv21_out = self.conv_layer(pool1_out,'conv_21')
+	conv22_out = self.conv_layer(conv21_out,'conv_22')
+	pool2_out = self.max_pool(conv22_out, 'pool2')
+
+	conv31_out = self.conv_layer(pool2_out,'conv_31')
+	conv32_out = self.conv_layer(conv31_out,'conv_32')
+	conv33_out = self.conv_layer(conv32_out,'conv_33')
+	pool3_out = self.max_pool(conv33_out, 'pool3')
+
+	conv41_out = self.conv_layer(pool3_out,'conv_41')
+	conv42_out = self.conv_layer(conv41_out,'conv_42')
+	conv43_out = self.conv_layer(conv42_out,'conv_43')
+	pool4_out = self.max_pool(conv43_out, 'pool4')
+
+	conv51_out = self.conv_layer(pool4_out,'conv_51')
+	conv52_out = self.conv_layer(conv51_out,'conv_52')
+	conv53_out = self.conv_layer(conv52_out,'conv_53')
+	pool5_out = self.max_pool(conv53_out, 'pool5')
+
+	# full connection layer
+	self.flatten = tf.reshape(pool5_out, [-1, 7*7*512])
+	self.full6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name = 'full6')
+	self.out = tf.layers.dense(self.full6, 1, name = 'out')
+
+	sess = tf.Session()
+
+	if restore_form:
+		saver = tf.train.Saver()
+		saver.restore(self.sess, restore_form)
+
+	else:
+		self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
+		self.train_op = tf.train.RMSPropOptimizer(0.001).minmize(self.loss)
+		self.sess.run(tf.global_variables_initializer())
+
+
+ 
+	def conv_layer(self, input, name):
+		with tf.variable_scope(name):
+			conv = tf.nn.conv2d(input, self.data_dict[name][0], [1,1,1,1], padding = 'SAME')
+			out = tf.nn.relu(tf.nn.bias_add(conv, self.data_dict[name][1])) 
+			return out
+
+	def max_pool(self, input, name):
+		with tf.variable_scope(name)
+			return tf.nn.max_pool(input , ksize = [1,2,2,1], strides = [1,2,2,1], padding='SAME')
+
+
+	def train(self,x,y):
+		loss, _ = self.sess.run([self.loss, self.train_op],{self.x:x, self.y:y})
+
+	def predict(self, paths):
+		
 	
 
 
