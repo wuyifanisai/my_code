@@ -139,9 +139,53 @@ class VGG16(object):
 
 	def train(self,x,y):
 		loss, _ = self.sess.run([self.loss, self.train_op],{self.x:x, self.y:y})
+		return loss
 
 	def predict(self, paths):
-		
+		fig , axs = plt.subplots(1,2)
+		for i , path in enumerate(paths):
+			x = resize_image(path)
+			length = self.sess.run(self.out, {self.x:x})
+
+			axs[i].set_title('length:%.1f cm'%length)
+			axs[i].imshow(x[0])
+			axs[i].set_xticks(())
+			axs[i].set_yticks(())
+		plt.show()
+
+	def save(self, path='e://transfer'):
+		saver = tf.train.Saver()
+		saver.save(self.sess, path , write_mate_graph= False)
+
+def train():
+	tigers_x, cats_x, tigers_y, cats_y=get_data()
+	train_x = np.concatenate(tigers_x + cats_x, axis = 0)
+	train_y = np.concatenate((tigers_y , cats_y), axis = 0)
+
+	vgg = VGG16(vgg16_npy_path = 'E://transfer//vgg16.npy')
+	print('vgg is bulit !')
+
+	for i in range(100):
+		loss  = vgg.train(train_x[np.random.randint(0,len(train_x),6)], train_y[np.random.randint(0,len(train_x),6)])
+		print('it is step',i,' the loss is', loss)
+	vgg.save()
+
+def test():
+	vgg = VGG16(vgg16_npy_path = 'E://transfer//vgg16.npy', restore_form = 'e://transfer')
+	vgg.predict(['http://farm1.static.flickr.com/101/266907904_a927c86af8.jpg'
+					,'http://farm3.static.flickr.com/2089/2146943800_c0a6d4606b.jpg'])
+
+if __name__ = '__main__':
+	image_load()
+	train()
+	test()
+
+
+
+
+
+
+
 	
 
 
