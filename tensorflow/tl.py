@@ -47,6 +47,10 @@ def resize_image(path):
 		new_image = image[yy:yy + short_edge, xx:xx + short_edge] ## get the center part of a image
 		resized_image = skimage.transform.resize(new_image, (224, 224))[None,:,:,:] ## transfrom the center part of image into 224x224 image
 		print('a image is resized !',resized_image.shape,'-----------')
+		if resized_image.shape != (1,224,224,3):
+			print('*******************************************************************************************************')
+			print(resized_image.shape)
+			print(path)
 		return resized_image
 	except:
 		print('error with skimage.io.imread')
@@ -63,7 +67,11 @@ def get_data():
 				resized_image = resize_image(os.path.join(dir, file))
 			except OSError:
 				continue
-			image[name].append(resized_image)
+
+			if resized_image is not None:
+				if resized_image.shape == (1,224,224,3):
+					image[name].append(resized_image)
+
 			if len(image[name]) == 400: #only use 400 iamges to get the train data
 				break
 	# get the label of length for tigers and cats
@@ -88,8 +96,8 @@ class VGG16(object):
 		self.y = tf.placeholder(tf.float32,[None,1])
 
 		## covert the RGB to BGR
-		red, green, blue = tf.split( 3,  3, value = self.x * 255.0)
-		bgr = tf.concat(3,values=[blue - self.vgg_mean[0], green - self.vgg_mean[1], red - self.vgg_mean[2],])	
+		red, green, blue = tf.split( split_dim = 3,  num_split = 3, value = self.x * 255.0)
+		bgr = tf.concat(concat_dim = 3,values=[blue - self.vgg_mean[0], green - self.vgg_mean[1], red - self.vgg_mean[2],])
 
 		# prepare vgg16 conv layer to get the parameters from trained model
 		conv11_out = self.conv_layer(bgr,'conv1_1')
@@ -117,18 +125,32 @@ class VGG16(object):
 
 		# full connection layer
 		self.flatten = tf.reshape(pool5_out, [-1, 7*7*512])
-		self.full6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name = 'full6')
-		self.out = tf.layers.dense(self.full6, 1, name = 'out')
 
-		sess = tf.Session()
+		self.out =self.build_layers(   
+							self.flatten,
+							256,
+							w_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
+							b_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
+							)
+
+		#self.full6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name = 'full6')
+		#self.out = tf.layers.dense(self.full6, 1, name = 'out')
+
+
+		self.sess = tf.Session()
 
 		if restore_form:
+			self.loss = tf.reduce_mean(tf.pow((self.y-self.out),2))
+			#self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
+			self.train_op = tf.train.RMSPropOptimizer(0.002).minimize(self.loss)
 			saver = tf.train.Saver()
 			saver.restore(self.sess, restore_form)
 
+
 		else:
-			self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
-			self.train_op = tf.train.RMSPropOptimizer(0.001).minmize(self.loss)
+			self.loss = tf.reduce_mean(tf.pow((self.y-self.out),2))
+			#self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
+			self.train_op = tf.train.RMSPropOptimizer(0.002).minimize(self.loss)
 			self.sess.run(tf.global_variables_initializer())
 
 
@@ -143,6 +165,16 @@ class VGG16(object):
 		with tf.variable_scope(name):
 			return tf.nn.max_pool(input , ksize = [1,2,2,1], strides = [1,2,2,1], padding='SAME')
 
+	def build_layers(self,s, n_l1, w_initializer, b_initializer, train=True):
+			with tf.variable_scope('full'):	
+				w1 = tf.get_variable('w1', [7*7*512, n_l1], initializer=w_initializer, trainable=train)
+				b1 = tf.get_variable('b_1', [1, n_l1], initializer=b_initializer,  trainable=train)
+				l1 = tf.nn.relu(tf.matmul(s, w1) + b1)
+			with tf.variable_scope('out'):
+				w2 = tf.get_variable('w2', [n_l1, 1], initializer=w_initializer,   trainable=train)
+				b2 = tf.get_variable('b_2', [1, 1], initializer=b_initializer,   trainable=train)
+				out = tf.matmul(l1, w2) + b2
+			return out
 
 	def train(self,x,y):
 		loss, _ = self.sess.run([self.loss, self.train_op],{self.x:x, self.y:y})
@@ -150,8 +182,10 @@ class VGG16(object):
 
 	def predict(self, paths):
 		fig , axs = plt.subplots(1,2)
-		for i , path in enumerate(paths):
+		for i , path in enumerate(paths):    
 			x = resize_image(path)
+			print(path)
+			print(x.shape)
 			length = self.sess.run(self.out, {self.x:x})
 
 			axs[i].set_title('length:%.1f cm'%length)
@@ -160,38 +194,53 @@ class VGG16(object):
 			axs[i].set_yticks(())
 		plt.show()
 
-	def save(self, path='e://transfer'):
+	def save(self, path='e:transfer\\model.ckpt'):
 		saver = tf.train.Saver()
-		saver.save(self.sess, path , write_mate_graph= False)
+		saver.save(self.sess, path)
 
 def train():
 
-	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy')
+	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy',restore_form = 'e:transfer\\.\\model.ckpt')
 	print('vgg is bulit !')
-	exit()
 
-	tigers_x, cats_x, tigers_y, cats_y=get_data()
-	train_x = np.concatenate((tigers_x ,cats_x), axis = 0)
+	tigers_x, cats_x, tigers_y, cats_y=get_data() 
+	print(type(tigers_x),len(tigers_x))
+	print(type(cats_x),len(cats_x))
+
+	# plot fake length distribution
+	plt.hist(tigers_y, bins=20, label='Tigers')
+	plt.hist(cats_y, bins=10, label='Cats')
+	plt.legend()
+	plt.xlabel('length')
+	#plt.show()
+
+	#tigers_x is a list, tiger_y is a array
+	train_x = np.concatenate( tigers_x+cats_x, axis = 0)
 	train_y = np.concatenate((tigers_y , cats_y), axis = 0)
-	print(train_x)
-	print(train_y)
+	print(type(train_x), train_x.shape)
+	print(type(train_y),train_y.shape)
 
+	for i in range(150): # number of iteratins for train
+		print('train step ==>',i)
+		id_batch = list(np.random.randint(0,len(train_x),6))   
 
-	for i in range(100): # number of iteratins for train
-		loss  = vgg.train(train_x[np.random.randint(0,len(train_x),6)], train_y[np.random.randint(0,len(train_x),6)])
+		loss  = vgg.train(  train_x[id_batch],  train_y[id_batch])
+
 		print('it is step',i,' the loss is', loss)
+	
 	vgg.save()
 
 def test():
-	vgg = VGG16(vgg16_npy_path = 'E://transfer//vgg16.npy', restore_form = 'e://transfer')
-	vgg.predict(['http://farm1.static.flickr.com/101/266907904_a927c86af8.jpg'
-					,'http://farm3.static.flickr.com/2089/2146943800_c0a6d4606b.jpg'])
+	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy', restore_form = 'e:transfer\\.\\model.ckpt')
+	vgg.predict([
+					'http://img.zcool.cn/community/0113be56640d5a32f8754573d17fa6.jpg'
+				])
 
 if __name__ == '__main__':
 	pass
 	#image_load()
-	train()
-	#test()
+	train() 
+	#test()  
 
 
 
