@@ -75,8 +75,9 @@ def get_data():
 			if len(image[name]) == 400: #only use 400 iamges to get the train data
 				break
 	# get the label of length for tigers and cats
-	tigers_label = np.maximum(20,np.random.rand(len(image['tiger']) , 1)*30 + 100)
-	cats_label = np.maximum(10,np.random.rand(len(image['cat']) , 1)*8 + 40)
+	tigers_label = np.array([1 for i in range(len(image['tiger']))]).reshape(-1,1)
+	cats_label = np.array([0 for i in range(len(image['cat']))]).reshape(-1,1)
+
 	return image['tiger'], image['cat'], tigers_label, cats_label
 
 
@@ -126,12 +127,26 @@ class VGG16(object):
 		# full connection layer
 		self.flatten = tf.reshape(pool5_out, [-1, 7*7*512])
 
-		self.out =self.build_layers(   
+		self.re = self.build_layers(   
 							self.flatten,
+							7*7*512,
 							256,
+							'tanh',
 							w_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
 							b_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
+							name = 'full'
 							)
+
+		self.out = self.build_layers(   
+							self.re,
+							256,
+							1,
+							'sigmoid',
+							w_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
+							b_initializer = tf.random_normal_initializer(mean=0,stddev =0.3),
+							name = 'out'
+							)
+
 
 		#self.full6 = tf.layers.dense(self.flatten, 256, tf.nn.relu, name = 'full6')
 		#self.out = tf.layers.dense(self.full6, 1, name = 'out')
@@ -140,7 +155,8 @@ class VGG16(object):
 		self.sess = tf.Session()
 
 		if restore_form:
-			self.loss = tf.reduce_mean(tf.pow((self.y-self.out),2))
+			#self.loss = -tf.reduce_sum(self.y*tf.log(self.out))
+			self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(targets = self.y, logits = self.out))
 			#self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
 			self.train_op = tf.train.RMSPropOptimizer(0.002).minimize(self.loss)
 			saver = tf.train.Saver()
@@ -148,7 +164,9 @@ class VGG16(object):
 
 
 		else:
-			self.loss = tf.reduce_mean(tf.pow((self.y-self.out),2))
+			#self.loss = -tf.reduce_sum(self.y*tf.log(self.out))
+			self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(targets = self.y, logits = self.out)) 
+
 			#self.loss = tf.losses.mean_squared_error(labels = self.y, predictions = self.out)
 			self.train_op = tf.train.RMSPropOptimizer(0.002).minimize(self.loss)
 			self.sess.run(tf.global_variables_initializer())
@@ -165,47 +183,59 @@ class VGG16(object):
 		with tf.variable_scope(name):
 			return tf.nn.max_pool(input , ksize = [1,2,2,1], strides = [1,2,2,1], padding='SAME')
 
-	def build_layers(self,s, n_l1, w_initializer, b_initializer, train=True):
-			with tf.variable_scope('full'):	
-				w1 = tf.get_variable('w1', [7*7*512, n_l1], initializer=w_initializer, trainable=train)
-				b1 = tf.get_variable('b_1', [1, n_l1], initializer=b_initializer,  trainable=train)
-				l1 = tf.nn.relu(tf.matmul(s, w1) + b1)
-			with tf.variable_scope('out'):
-				w2 = tf.get_variable('w2', [n_l1, 1], initializer=w_initializer,   trainable=train)
-				b2 = tf.get_variable('b_2', [1, 1], initializer=b_initializer,   trainable=train)
-				out = tf.matmul(l1, w2) + b2
+	def build_layers(self,s,in_dimension, out_dimension ,action,w_initializer, b_initializer, name,train=True):
+			with tf.variable_scope(name):	
+				w1 = tf.get_variable('w1', [in_dimension, out_dimension], initializer=w_initializer, trainable=train)
+				b1 = tf.get_variable('b_1', [1, out_dimension], initializer=b_initializer,  trainable=train)
+				if action =='tanh':
+					out = tf.nn.tanh(tf.matmul(s, w1) + b1)
+				elif action == 'sigmoid':
+					out = tf.nn.sigmoid(tf.matmul(s, w1) + b1)
 			return out
 
 	def train(self,x,y):
 		loss, _ = self.sess.run([self.loss, self.train_op],{self.x:x, self.y:y})
+		print(self.sess.run([self.out,self.y],{self.x:x,self.y:y}))
+		print()
+
 		return loss
 
 	def predict(self, paths):
-		fig , axs = plt.subplots(1,3)
+		fig , axs = plt.subplots(1,4)
 		for i , path in enumerate(paths):    
 			x = resize_image(path)
 			print(path)
 			print(x.shape)
-			length = self.sess.run(self.out, {self.x:x})
+			out = self.sess.run(self.out[0], {self.x:x})
+			if out > 0.5:
+				animal  = 'tiger'
+				print(self.sess.run(self.out,{self.x:x}))
+				percent = self.sess.run(self.out,{self.x:x})
+				axs[i].set_title(animal+str(percent))
+			
+			else:
+				print(self.sess.run(self.out,{self.x:x}))
+				animal = 'cat'
+				percent = 1-self.sess.run(self.out,{self.x:x})
+				axs[i].set_title(animal+str(percent))
 
-			axs[i].set_title('length:%.1f cm'%length)
 			axs[i].imshow(x[0])
 			axs[i].set_xticks(())
 			axs[i].set_yticks(())
 		plt.show()
 
-	def save(self, path='e:transfer\\model.ckpt'):
+	def save(self, path='e:\\\model.ckpt'):
 		saver = tf.train.Saver()
 		saver.save(self.sess, path)
 
 def train():
 
-	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy',restore_form = 'e:transfer\\.\\model.ckpt')
+	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy', restore_form = 'e:tf2\\.\\model.ckpt')
 	print('vgg is bulit !')
 
 	tigers_x, cats_x, tigers_y, cats_y=get_data() 
-	print(type(tigers_x),len(tigers_x))
-	print(type(cats_x),len(cats_x))
+	print(tigers_y)
+	print(cats_y)
 
 	# plot fake length distribution
 	plt.hist(tigers_y, bins=20, label='Tigers')
@@ -217,6 +247,8 @@ def train():
 	#tigers_x is a list, tiger_y is a array
 	train_x = np.concatenate( tigers_x+cats_x, axis = 0)
 	train_y = np.concatenate((tigers_y , cats_y), axis = 0)
+	print(train_y)
+
 	print(type(train_x), train_x.shape)
 	print(type(train_y),train_y.shape)
 
@@ -230,19 +262,19 @@ def train():
 	
 	vgg.save()
 
-def test():
-	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy', restore_form = 'e:transfer\\.\\model.ckpt')
-	vgg.predict([
-				'http://img1.qunarzz.com/sight/p0/1410/14/a3924d979cb6cd068e3292cd3f4dddce.jpg',
-				'http://img1.imgtn.bdimg.com/it/u=853089164,585198317&fm=200&gp=0.jpg'
-				])
+def test(url_list):
+	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy', restore_form = 'e:tf2\\.\\model.ckpt')
+	vgg.predict(url_list)
 
+
+############################################### run this script ####################################
 if __name__ == '__main__':
 	pass
 	#image_load()
 	#train() 
-	test()  
-
+	test(['https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1518959304401&di=a9ed4dadbd0146987a08287ccc0e0f34&imgtype=0&src=http%3A%2F%2Fpic25.photophoto.cn%2F20121203%2F0035035062286364_b.jpg'])
+	
+		
 
 
 
