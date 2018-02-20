@@ -207,28 +207,16 @@ class VGG16(object):
 		return loss
 
 	def predict(self, paths):
-		fig , axs = plt.subplots(1,4)
+		fig , axs = plt.subplots(2,1)
 		for i , path in enumerate(paths):    
 			x = resize_image(path)
 			print(path)
 			print(x.shape)
 			out = self.sess.run(self.out, {self.x:x})
-
-			if out == 1:
-				animal = 'tiger'
-				axs[i].set_title(animal)
-			
-			elif out == 0:
-				animal = 'cat'
-				axs[i].set_title(animal)
-
-			elif out == 2:
-				animal = 'dog'
-				axs[i].set_title(animal)
-
-
+			print(out[0])
+			axs[i].set_title('tiger:'+str(100*np.round(out[0][0],2))+'cat:'+str(100*np.round(out[0][1],2))+'dog:'+str(100*np.round(out[0][2],2)))
 			axs[i].imshow(x[0])
-			axs[i].set_xticks(())
+			axs[i].set_xticks(()) 
 			axs[i].set_yticks(())
 		plt.show()
 
@@ -238,7 +226,7 @@ class VGG16(object):
 
 def train():
 
-	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy')
+	vgg = VGG16(vgg16_npy_path = 'E://vgg16.npy',restore_form = 'e:\\transfer_mutile\\model.ckpt')
 	print('vgg is bulit !')
 
 	tigers_x, cats_x, dogs_x, tigers_y, cats_y, dog_y = get_data() 
@@ -246,11 +234,11 @@ def train():
 	#tigers_x is a list, tiger_y is a array
 	train_x = np.concatenate( tigers_x+cats_x+dogs_x, axis = 0)
 	train_y = np.concatenate((tigers_y , cats_y, dog_y), axis = 0)
-
+ 
 	print(type(train_x), train_x.shape)
 	print(type(train_y),train_y.shape)
 
-	for i in range(200): # number of iteratins for train
+	for i in range(50): # number of iteratins for train
 		print('train step ==>',i)
 		id_batch = list(np.random.randint(0,len(train_x),6))   
 
@@ -267,8 +255,8 @@ def test(url_list):
 ############################################### run this script ####################################
 if __name__ == '__main__':
 	#image_load()
-	train() 
-	#test(['https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1518959304401&di=a9ed4dadbd0146987a08287ccc0e0f34&imgtype=0&src=http%3A%2F%2Fpic25.photophoto.cn%2F20121203%2F0035035062286364_b.jpg'])
+	#train() 
+	test(['http://imgsrc.baidu.com/imgad/pic/item/a9d3fd1f4134970a79b8472f9fcad1c8a6865de2.jpg'])
 	
 		
        
