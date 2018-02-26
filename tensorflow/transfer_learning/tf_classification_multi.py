@@ -207,14 +207,16 @@ class VGG16(object):
 		return loss
 
 	def predict(self, paths):
-		fig , axs = plt.subplots(2,1)
+		fig , axs = plt.subplots(3,1)
 		for i , path in enumerate(paths):    
 			x = resize_image(path)
 			print(path)
 			print(x.shape)
 			out = self.sess.run(self.out, {self.x:x})
 			print(out[0])
-			axs[i].set_title('tiger:'+str(100*np.round(out[0][0],2))+'cat:'+str(100*np.round(out[0][1],2))+'dog:'+str(100*np.round(out[0][2],2)))
+			total = out[0][0]+out[0][1]+out[0][2]
+
+			axs[i].set_title('tiger:'+str(round(100*out[0][0]/total,2))+'||cat:'+str(round(100*out[0][1]/total))+'||dog:'+str(round(100*out[0][2]/total)))
 			axs[i].imshow(x[0])
 			axs[i].set_xticks(()) 
 			axs[i].set_yticks(())
@@ -235,15 +237,19 @@ def train():
 	train_x = np.concatenate( tigers_x+cats_x+dogs_x, axis = 0)
 	train_y = np.concatenate((tigers_y , cats_y, dog_y), axis = 0)
  
-	print(type(train_x), train_x.shape)
+	print(type(train_x), train_x.shape)   
 	print(type(train_y),train_y.shape)
 
 	for i in range(50): # number of iteratins for train
 		print('train step ==>',i)
-		id_batch = list(np.random.randint(0,len(train_x),6))   
+		#id_batch = list(np.random.randint(0,len(train_x),6)) 
+
+		id_tiger = list(np.random.randint(0,len(tigers_x),3))
+		id_cat = list(np.random.randint(len(tigers_x), len(tigers_x) + len(cats_x), 3))
+		id_dog = list(np.random.randint(len(tigers_x) + len(cats_x), len(tigers_x) + len(cats_x) + len(dogs_x), 3))
+		id_batch = id_tiger + id_cat + id_dog
 
 		loss  = vgg.train(  train_x[id_batch],  train_y[id_batch])
-
 		print('it is step',i,' the loss is', loss)
 	
 	vgg.save()
@@ -256,11 +262,12 @@ def test(url_list):
 if __name__ == '__main__':
 	#image_load()
 	#train() 
-	test(['http://imgsrc.baidu.com/imgad/pic/item/a9d3fd1f4134970a79b8472f9fcad1c8a6865de2.jpg'])
+	test([ 
+			'https://timgsa.baidu.com/timg?image&quality=80&size=b9999_10000&sec=1519398184445&di=333bb0ff3b763feee8048538cf6ec979&imgtype=0&src=http%3A%2F%2Fimgsrc.baidu.com%2Fimage%2Fc0%253Dpixel_huitu%252C0%252C0%252C294%252C40%2Fsign%3D29ab871b798b4710da22f58caab6a691%2F9f510fb30f2442a74a39829fda43ad4bd11302d0.jpg'
+			])
 	
 		
-       
-
+   
 
 
 
