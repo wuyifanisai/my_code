@@ -105,6 +105,8 @@ object demo1 {
     println(dog.isOld())
     dog.generating()
     
+    new Dog(5, "female","white","amy").eat();//类似于匿名类的实例化对象以及调用方法
+    
     animal_protected()
    
     def evaluateModel(model:LogisticRegressionModel, validationData:RDD[LabeledPoint]):Double={
