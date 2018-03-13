@@ -39,6 +39,24 @@ trait live{//定义了一个借口， 用于规范animal的live操作
   def generating():Unit
 }
 
+class Weapon(price : Int, type : String){
+  var price_ = price
+  val type_ = type
+
+  def reload(num:Int): String = {
+    println("the Weapon is reloaded ")
+    return "on the way"
+  }
+
+  def fire(s:String):Unit={
+    if(s == "on the way"){
+      println("the Weapon is working")
+    }else{
+      println("please reload") 
+    }
+  }
+
+}
 
 class Animal( age: Int ,  sex:String, color:String) extends live {
   //定义了一个animal的类，同时接上了live的借口

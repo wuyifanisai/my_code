@@ -1,4 +1,5 @@
 //其他java文件中的类可以导入，但是定义在那个jave文件中单独定义的方法无法导入其中
+//定义在一个源文件中的主方法中的类是不能被其他源文件所导入应用的
 package demo.demo2;
 import demo.demo.Animal;
 import demo.demo.Anmial_generate;
@@ -9,6 +10,15 @@ import demo.demo.Live_dog;
 //import demo.demo.show;
 
 public class demo2 {
+	public static class Gun{
+		int price;
+		public Gun(int price){
+			this.price = price;
+		}
+		public void shot(){
+			System.out.println("shot the hunters !");
+		}
+	}
 	public static void main(String args[]) {
 
 		class People<T> {// 因为是在主方法之内定义的，所以不用需要static关键词，以便主方法中可调用
@@ -68,6 +78,7 @@ public class demo2 {
 		Dog d = (Dog) animal; // 向下转型
 		d.move(); // 调用dog的move方法
 		//show(d);// 定义在主方法外部的类型判断函数
+		new Gun(100).shot();
 
 	}
 
